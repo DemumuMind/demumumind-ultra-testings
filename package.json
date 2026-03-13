@@ -1,0 +1,23 @@
+{
+  "name": "demumumind-ultra-testings",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.29.2",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev:server": "pnpm --filter @shannon/server dev",
+    "dev:daemon": "pnpm --filter @shannon/server dev",
+    "dev:web": "pnpm --filter @shannon/web dev",
+    "dev:desktop": "pnpm --filter @shannon/web dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

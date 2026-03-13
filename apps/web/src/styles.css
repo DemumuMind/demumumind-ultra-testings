@@ -1,0 +1,247 @@
+:root {
+  color-scheme: dark;
+  --bg: #07141a;
+  --bg-elevated: rgba(11, 33, 42, 0.86);
+  --bg-card: rgba(9, 25, 32, 0.95);
+  --border: rgba(149, 191, 199, 0.18);
+  --text: #f3f8f7;
+  --muted: #99afb5;
+  --accent: #8ad4c1;
+  --accent-strong: #f5aa6a;
+  --danger: #ff8a7a;
+  --shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+  font-family:
+    "IBM Plex Sans",
+    "Segoe UI",
+    sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(138, 212, 193, 0.18), transparent 38%),
+    radial-gradient(circle at top right, rgba(245, 170, 106, 0.16), transparent 28%),
+    linear-gradient(180deg, #07141a 0%, #041015 100%);
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: transparent;
+}
+
+a {
+  color: var(--accent);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.85rem 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), #4eb8d5);
+  color: #062028;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+input,
+select {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: rgba(5, 18, 23, 0.82);
+  color: var(--text);
+  padding: 0.85rem 1rem;
+}
+
+.page-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem 1.2rem 3rem;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.hero h1,
+.panel h2 {
+  margin: 0;
+  font-family:
+    "Space Grotesk",
+    "Segoe UI",
+    sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.hero h1 {
+  font-size: clamp(2.8rem, 8vw, 4.8rem);
+  line-height: 0.96;
+}
+
+.hero-copy {
+  max-width: 62ch;
+  color: var(--muted);
+}
+
+.eyebrow,
+.label {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.status-tile,
+.panel,
+.target-card,
+.timeline-item,
+.finding-card,
+.device-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 1.4rem;
+  box-shadow: var(--shadow);
+}
+
+.status-tile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  min-width: 240px;
+}
+
+.status-dot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  background: var(--danger);
+  box-shadow: 0 0 0 0.4rem rgba(255, 138, 122, 0.14);
+}
+
+.status-dot.online {
+  background: var(--accent);
+  box-shadow: 0 0 0 0.4rem rgba(138, 212, 193, 0.14);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.panel {
+  grid-column: span 4;
+  padding: 1.2rem;
+}
+
+.panel-primary {
+  grid-column: span 8;
+  background:
+    linear-gradient(135deg, rgba(138, 212, 193, 0.08), transparent),
+    linear-gradient(180deg, rgba(8, 25, 31, 0.96), rgba(6, 18, 23, 0.96));
+}
+
+.panel-wide {
+  grid-column: span 8;
+}
+
+.panel-header,
+.card-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.controls-stack {
+  margin-top: 1rem;
+}
+
+.inline-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.muted,
+.status-note {
+  color: var(--muted);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(138, 212, 193, 0.2);
+  padding: 0.35rem 0.7rem;
+  color: var(--accent);
+  background: rgba(138, 212, 193, 0.08);
+  font-size: 0.82rem;
+}
+
+.card-grid,
+.timeline {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.target-card,
+.timeline-item,
+.finding-card,
+.device-card {
+  padding: 1rem;
+  background: var(--bg-card);
+}
+
+@media (max-width: 960px) {
+  .hero {
+    flex-direction: column;
+  }
+
+  .panel,
+  .panel-primary,
+  .panel-wide {
+    grid-column: 1 / -1;
+  }
+
+  .inline-grid {
+    grid-template-columns: 1fr;
+  }
+}

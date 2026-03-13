@@ -1,0 +1,19 @@
+{
+  "name": "@shannon/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "demumumind": "./dist/index.js",
+    "shannon-lite-plus": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@shannon/shared": "workspace:*",
+    "commander": "^14.0.3"
+  }
+}
