@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runCli } from "./run-cli.js";
+import { CLI_QUICK_START_HELP, runCli } from "./run-cli.js";
 import type {
   BrowserLoginResult,
   DeviceLoginPollResult,
@@ -219,6 +219,14 @@ function createFakeApiClient() {
 }
 
 describe("runCli", () => {
+  test("publishes quick start guidance for clone-based local CLI usage", () => {
+    expect(CLI_QUICK_START_HELP).toContain("git clone https://github.com/DemumuMind/demumumind-ultra-testings.git");
+    expect(CLI_QUICK_START_HELP).toContain("corepack enable");
+    expect(CLI_QUICK_START_HELP).toContain("pnpm install");
+    expect(CLI_QUICK_START_HELP).toContain("pnpm build");
+    expect(CLI_QUICK_START_HELP).toContain("pnpm exec demumumind /doctor");
+  });
+
   test("completes device authorization and persists the local session", async () => {
     const directory = await mkdtemp(join(tmpdir(), "shannon-cli-"));
 

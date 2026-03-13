@@ -12,8 +12,16 @@ describe("public repository metadata", () => {
     const readme = await readFile(readmePath, "utf8");
 
     expect(readme).toContain("# DemumuMind Ultra Testings");
+    expect(readme).toContain("Самый простой путь");
     expect(readme).toContain("Windows-first");
     expect(readme).toContain("Quick Start");
+    expect(readme).toContain("git clone https://github.com/DemumuMind/demumumind-ultra-testings.git");
+    expect(readme).toContain("corepack enable");
+    expect(readme).toContain("pnpm install");
+    expect(readme).toContain("pnpm build");
+    expect(readme).toContain("pnpm exec demumumind /doctor");
+    expect(readme).toContain("pnpm exec demumumind /project init");
+    expect(readme).toContain("pnpm exec demumumind /scan start");
     expect(readme).toContain("demumumind /doctor");
     expect(readme).toContain("Desktop Shell");
     expect(readme).toContain("Web Control Plane");
@@ -31,6 +39,7 @@ describe("public repository metadata", () => {
       bugs?: { url?: string };
       homepage?: string;
       keywords?: string[];
+      scripts?: Record<string, string>;
     };
 
     expect(packageJson.name).toBe("demumumind-ultra-testings");
@@ -56,5 +65,10 @@ describe("public repository metadata", () => {
         "typescript"
       ])
     );
+    expect(packageJson.scripts).toMatchObject({
+      cli: "pnpm --filter @shannon/cli exec demumumind",
+      "cli:dev": "pnpm --filter @shannon/cli dev",
+      doctor: "pnpm --filter @shannon/cli exec demumumind /doctor"
+    });
   });
 });

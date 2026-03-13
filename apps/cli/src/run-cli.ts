@@ -25,6 +25,20 @@ interface RunCliDependencies {
 }
 
 const DEFAULT_USER_ID = "local-cli-user";
+export const CLI_QUICK_START_HELP = `
+Quick Start
+
+  git clone https://github.com/DemumuMind/demumumind-ultra-testings.git
+  cd demumumind-ultra-testings
+  corepack enable
+  pnpm install
+  pnpm build
+  pnpm exec demumumind /doctor
+
+  First real run:
+  pnpm exec demumumind /project init --name "Demo project" --base-url http://127.0.0.1:3000 --project-root . --source-root .
+  pnpm exec demumumind /scan start --project-id <project-id>
+`;
 
 function resolveSessionFilePath(override?: string): string {
   return override ?? join(homedir(), ".demumumind", "session.json");
@@ -118,6 +132,7 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
   program
     .name("demumumind")
     .description("DemumuMind Ultra Testings CLI for Windows-first AppSec automation");
+  program.addHelpText("afterAll", CLI_QUICK_START_HELP);
 
   program
     .command("login")

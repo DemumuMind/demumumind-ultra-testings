@@ -4,6 +4,17 @@ Windows-first all-in-one AppSec platform for white-box testing of web applicatio
 
 `DemumuMind Ultra Testings` combines a slash-driven CLI, a local daemon, a desktop shell, and a web control plane into one workflow for project bootstrap, scan orchestration, evidence collection, and correlated security reporting.
 
+## Самый простой путь
+
+```powershell
+git clone https://github.com/DemumuMind/demumumind-ultra-testings.git
+cd demumumind-ultra-testings
+corepack enable
+pnpm install
+pnpm build
+pnpm exec demumumind /doctor
+```
+
 ## Why
 
 - Windows-first runtime without mandatory Docker or WSL
@@ -20,8 +31,10 @@ Primary binary: `demumumind`
 
 Supported interaction styles:
 
-- Slash commands such as `demumumind /doctor`, `demumumind /scan start`, `demumumind /report open`
-- Standard automation commands such as `demumumind doctor`, `demumumind project init`, `demumumind scan run`
+- From the cloned repository, run the CLI as `pnpm exec demumumind ...`
+- Slash commands such as `pnpm exec demumumind /doctor`, `pnpm exec demumumind /scan start`, `pnpm exec demumumind /report open`
+- Standard automation commands such as `pnpm exec demumumind doctor`, `pnpm exec demumumind project init`, `pnpm exec demumumind scan run`
+- Shortcut scripts also exist at the repo root: `pnpm run doctor` and `pnpm cli -- /doctor`
 
 ### Local Daemon
 
@@ -48,38 +61,45 @@ Background service: `demumumindd`
 
 - Windows
 - Node.js 22+
-- pnpm 10+
+- Corepack
 - Optional provider keys:
   - `OPENAI_API_KEY`
   - `NVIDIA_API_KEY`
   - `NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1`
 
-### Install Dependencies
+### Install And Build
 
 ```powershell
+git clone https://github.com/DemumuMind/demumumind-ultra-testings.git
+cd demumumind-ultra-testings
+corepack enable
 pnpm install
+pnpm build
 ```
 
-### Run The Local Stack
+If `pnpm` is missing, run `corepack enable` first instead of installing a separate global package manager manually.
+
+### Run Doctor
+
+```powershell
+pnpm exec demumumind /doctor
+```
+
+### First Real Run
+
+```powershell
+pnpm exec demumumind /project init --name "Demo project" --base-url http://127.0.0.1:3000 --project-root . --source-root .
+pnpm exec demumumind /scan start --project-id <project-id>
+```
+
+### Local Control Plane
 
 ```powershell
 pnpm dev:server
 pnpm dev:web
 ```
 
-### Run Doctor
-
-```powershell
-demumumind /doctor
-```
-
-### Bootstrap A Project
-
-```powershell
-demumumind /project init --source . --target http://127.0.0.1:3000
-```
-
-This creates:
+### What Project Bootstrap Creates
 
 - `demumumind.config.yaml`
 - `policies/default.yaml`
@@ -87,13 +107,13 @@ This creates:
 ### Start A Scan
 
 ```powershell
-demumumind /scan start --project <project-id>
+pnpm exec demumumind /scan start --project-id <project-id>
 ```
 
 ### Open The Report
 
 ```powershell
-demumumind /report open --scan <scan-id>
+pnpm exec demumumind /report open --scan-run-id <scan-id>
 ```
 
 ## Scanning Model
@@ -140,6 +160,8 @@ Bootstrap a Windows workstation:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\install-demumumind.ps1
 ```
+
+Use the PowerShell installer as a guided bootstrap option. The primary documented path for CLI setup remains the manual `git clone -> corepack enable -> pnpm install -> pnpm build -> pnpm exec demumumind /doctor` flow above.
 
 ## Verification
 

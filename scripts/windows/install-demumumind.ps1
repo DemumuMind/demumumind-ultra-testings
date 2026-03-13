@@ -179,6 +179,7 @@ try {
 Show-DoctorSummary -WorkspaceRoot $ProjectRoot -DesktopRequested $desktopRequested -DaemonRequested $daemonRequested
 Write-Host ""
 Write-Host "Bootstrap complete" -ForegroundColor Green
+Write-Host "- Run `pnpm exec demumumind /doctor` to verify the local CLI."
 Write-Host "- Run `pnpm dev:web` for the localhost control plane."
 Write-Host "- Run `pnpm dev:desktop` for the Electron shell."
-Write-Host "- Run `demumumind /doctor` after adding provider keys."
+Write-Host "- Guided installer is optional; the canonical repo flow is clone -> corepack enable -> pnpm install -> pnpm build -> pnpm exec demumumind /doctor."

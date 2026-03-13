@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@shannon/cli':
+        specifier: workspace:*
+        version: link:apps/cli
       '@types/node':
         specifier: ^24.5.2
         version: 24.12.0
