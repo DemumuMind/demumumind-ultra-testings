@@ -10,6 +10,7 @@ Thumbs.db
 .env.*.local
 data/
 artifacts/
+*.tsbuildinfo
 .serena/
 .tmp-data/
 .tmp-data-2/
