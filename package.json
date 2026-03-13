@@ -1,7 +1,27 @@
 {
   "name": "demumumind-ultra-testings",
   "version": "0.1.0",
-  "private": true,
+  "description": "Windows-first all-in-one AppSec platform for white-box testing of web applications and APIs.",
+  "private": false,
+  "license": "MIT",
+  "homepage": "https://github.com/DemumuMind/demumumind-ultra-testings#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DemumuMind/demumumind-ultra-testings.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DemumuMind/demumumind-ultra-testings/issues"
+  },
+  "keywords": [
+    "appsec",
+    "security-testing",
+    "pentesting",
+    "white-box",
+    "windows",
+    "typescript",
+    "api-security",
+    "web-security"
+  ],
   "type": "module",
   "packageManager": "pnpm@10.29.2",
   "scripts": {
