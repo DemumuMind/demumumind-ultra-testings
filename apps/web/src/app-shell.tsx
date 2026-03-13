@@ -1,343 +1,199 @@
-import type { ReactNode } from "react";
-
-interface DeviceLoginState {
-  verificationUri: string;
-  userCode: string;
-  sessionId: string;
-}
-
-interface LatestReportState {
-  report: {
-    id: string;
-    scanRunId: string;
-    findingIds: string[];
-    coverageMatrix: Array<{
-      id: string;
-      title: string;
-      status: string;
-      proofType: string;
-    }>;
-    unsupportedClasses: string[];
-  };
-  findings: Array<{
-    id: string;
-    attackDomain: string;
-    title: string;
-    proofOfImpact: string;
-    proofType: string;
-  }>;
-}
-
-interface ProjectPolicyState {
-  activeValidationAllowed: boolean;
-  destructiveChecksEnabled: boolean;
-  allowedExploitClasses: string[];
-}
-
-interface ExploitPackState {
-  id: string;
-  title: string;
-  attackDomain: string;
-  proofType: string;
-  permissionLevel: string;
-}
+import type { WorkflowDetail, WorkflowSummary, WorkspaceSummary } from "@shannon/shared";
+import type { ProviderResponse } from "./api.js";
 
 interface AppShellState {
-  operatorId: string;
   authState: "connected" | "pending" | "disconnected";
   connectionEmail: string | null;
-  doctorStatus: string;
-  projects: Array<{
-    id: string;
-    name: string;
-    baseUrl: string;
-    sourceRoots: string[];
-    proofMode: string;
-  }>;
-  providers: Array<{
-    kind: string;
-    status: string;
-  }>;
-  capabilities: Array<{
-    id: string;
-    category: string;
-    permissionLevel: string;
-  }>;
-  exploitPacks: ExploitPackState[];
-  selectedPolicy: ProjectPolicyState | null;
-  runners: Array<{
-    id: string;
-    name: string;
-    mode: string;
-    status: string;
-    endpoint?: string;
-    managed: boolean;
-    lastSeenAt: string;
-  }>;
-  scans: Array<{
-    id: string;
-    status: string;
-    projectId: string;
-    phaseHistory: string[];
-  }>;
-  latestReport: LatestReportState | null;
-  deviceLogin: DeviceLoginState | null;
+  providers: ProviderResponse[];
+  workflows: WorkflowSummary[];
+  workspaces: WorkspaceSummary[];
+  selectedWorkflowId: string | null;
+  workflowDetail: WorkflowDetail | null;
 }
 
 interface AppShellProps {
   state: AppShellState;
-  controls?: ReactNode;
 }
 
-export function AppShell({ state, controls }: AppShellProps) {
-  const operatorStatusLabel =
-    state.authState === "connected"
-      ? "Connected"
-      : state.authState === "pending"
-        ? "Pending login"
-        : "Not connected";
+function formatCurrency(value: number): string {
+  return `$${value.toFixed(4)}`;
+}
+
+function formatDuration(durationMs: number): string {
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
+export function AppShell({ state }: AppShellProps) {
+  const selectedWorkflow =
+    state.workflowDetail?.workflow ??
+    state.workflows.find((workflow) => workflow.id === state.selectedWorkflowId) ??
+    state.workflows[0] ??
+    null;
 
   return (
-    <div className="page-shell">
-      <header className="hero">
+    <div className="workflow-page">
+      <header className="workflow-hero">
         <div>
-          <p className="eyebrow">Desktop Shell</p>
-          <h1>DemumuMind Ultra Testings</h1>
+          <p className="eyebrow">Shannon-Style Runner</p>
+          <h1>Workflow Dashboard</h1>
           <p className="hero-copy">
-            Windows-first AppSec control plane with local runner orchestration, slash-first CLI,
-            safe proof validation, and evidence-linked reporting.
+            CLI-first workflow monitoring for local AppSec runs, with compact run statistics,
+            workspace history, and evidence-linked summaries.
           </p>
         </div>
-        <div className="status-tile">
-          <span className={`status-dot ${state.connectionEmail ? "online" : "offline"}`} />
-          <div>
-            <p className="label">Operator</p>
-            <strong>{state.operatorId}</strong>
-            <p className="muted">{operatorStatusLabel}</p>
-            <p className="muted">
-              {state.doctorStatus === "ready" ? "Windows ready" : "Needs environment fixes"}
-            </p>
+        <div className="hero-meta">
+          <div className="status-badge">
+            <span className={`status-dot ${state.authState === "connected" ? "online" : "offline"}`} />
+            <div>
+              <p className="label">Operator</p>
+              <strong>{state.connectionEmail ?? "local-cli-user"}</strong>
+              <p className="muted">{state.authState}</p>
+            </div>
+          </div>
+          <div className="provider-strip">
+            {state.providers.map((provider) => (
+              <div key={provider.kind} className="provider-chip">
+                <strong>{provider.label}</strong>
+                <span>{provider.status}</span>
+              </div>
+            ))}
           </div>
         </div>
       </header>
 
-      <main className="dashboard-grid">
+      <main className="workflow-grid">
+        <section className="panel panel-wide">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Workspaces</p>
+              <h2>Recent Workspaces</h2>
+            </div>
+            <span className="pill">{state.workspaces.length}</span>
+          </div>
+          <div className="workspace-list">
+            {state.workspaces.length === 0 ? (
+              <p className="empty-copy">No workspaces recorded yet.</p>
+            ) : (
+              state.workspaces.map((workspace) => (
+                <article key={workspace.id} className="workspace-card">
+                  <div className="card-topline">
+                    <strong>{workspace.name}</strong>
+                    <span className="pill">{workspace.status}</span>
+                  </div>
+                  <p>{workspace.targetUrl}</p>
+                  <p className="muted">{workspace.repoPath}</p>
+                  <p className="muted">last workflow: {workspace.lastWorkflowId ?? "none"}</p>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Workflows</p>
+              <h2>Run History</h2>
+            </div>
+            <span className="pill">{state.workflows.length}</span>
+          </div>
+          <div className="timeline">
+            {state.workflows.length === 0 ? (
+              <p className="empty-copy">No workflows available.</p>
+            ) : (
+              state.workflows.map((workflow) => (
+                <article key={workflow.id} className="timeline-item">
+                  <div className="card-topline">
+                    <strong>{workflow.id}</strong>
+                    <span className="pill">{workflow.status}</span>
+                  </div>
+                  <p>{workflow.workspace}</p>
+                  <p className="muted">{workflow.targetUrl}</p>
+                  <p className="muted">{formatDuration(workflow.durationMs)}</p>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+
         <section className="panel panel-primary">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Control plane</p>
-              <h2>Onboarding and Scan Control</h2>
+              <p className="eyebrow">Selected Workflow</p>
+              <h2>{selectedWorkflow?.id ?? "No workflow selected"}</h2>
             </div>
-            <span className="pill">{state.projects.length} projects</span>
+            {selectedWorkflow ? <span className="pill">{selectedWorkflow.status}</span> : null}
           </div>
-          {controls ?? (
-            <div className="stack">
-              <p className="muted">Interactive controls are injected by the client application.</p>
+          {selectedWorkflow ? (
+            <div className="stats-grid">
+              <article className="stat-card">
+                <p className="label">Total Cost</p>
+                <strong>{formatCurrency(selectedWorkflow.totalCostUsd)}</strong>
+              </article>
+              <article className="stat-card">
+                <p className="label">Turns</p>
+                <strong>{selectedWorkflow.totalTurns}</strong>
+              </article>
+              <article className="stat-card">
+                <p className="label">Agents</p>
+                <strong>{selectedWorkflow.agentCount}</strong>
+              </article>
+              <article className="stat-card">
+                <p className="label">Duration</p>
+                <strong>{formatDuration(selectedWorkflow.durationMs)}</strong>
+              </article>
             </div>
+          ) : (
+            <p className="empty-copy">Run a workflow to populate the dashboard.</p>
           )}
         </section>
 
         <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Authentication</p>
-              <h2>Operator Auth</h2>
+              <p className="eyebrow">Agent Breakdown</p>
+              <h2>Agent Breakdown</h2>
             </div>
-            <span className="pill">{operatorStatusLabel}</span>
           </div>
           <div className="timeline">
-            <article className="timeline-item">
-              <div className="card-topline">
-                <strong>Current operator</strong>
-                <span className="pill">{state.authState}</span>
-              </div>
-              <p>{state.connectionEmail ?? "No linked profile yet"}</p>
-            </article>
-            {state.deviceLogin ? (
-              <div className="device-card">
-                <p className="label">Device login</p>
-                <strong>{state.deviceLogin.userCode}</strong>
-                <a href={state.deviceLogin.verificationUri} target="_blank" rel="noreferrer">
-                  {state.deviceLogin.verificationUri}
-                </a>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Providers</p>
-              <h2>LLM Backends</h2>
-            </div>
-            <span className="pill">{state.providers.length}</span>
-          </div>
-          <div className="timeline">
-            {state.providers.map((provider) => (
-              <article key={provider.kind} className="timeline-item">
+            {selectedWorkflow?.agentBreakdown.map((agent) => (
+              <article key={agent.id} className="timeline-item">
                 <div className="card-topline">
-                  <strong>{provider.kind}</strong>
-                  <span className="pill">{provider.status}</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Capabilities</p>
-              <h2>Capability Packs</h2>
-            </div>
-          </div>
-          <div className="timeline">
-            {state.capabilities.map((capability) => (
-              <article key={capability.id} className="timeline-item">
-                <div className="card-topline">
-                  <strong>{capability.id}</strong>
-                  <span className="pill">{capability.permissionLevel}</span>
-                </div>
-                <p className="muted">{capability.category}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel panel-wide">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Projects</p>
-              <h2>Registered Workspaces</h2>
-            </div>
-          </div>
-          <div className="card-grid">
-            {state.projects.length === 0 ? (
-              <p className="muted">No projects registered yet.</p>
-            ) : (
-              state.projects.map((project) => (
-                <article key={project.id} className="target-card">
-                  <div className="card-topline">
-                    <strong>{project.name}</strong>
-                    <span className="pill">{project.proofMode}</span>
-                  </div>
-                  <p>{project.baseUrl}</p>
-                  <p className="muted">{project.sourceRoots.join(", ")}</p>
-                </article>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Policy</p>
-              <h2>Project Policy</h2>
-            </div>
-          </div>
-          <div className="timeline">
-            {state.selectedPolicy ? (
-              <article className="timeline-item">
-                <div className="card-topline">
-                  <strong>Validation mode</strong>
-                  <span className="pill">
-                    {state.selectedPolicy.destructiveChecksEnabled ? "destructive-enabled" : "safe"}
-                  </span>
+                  <strong>{agent.label}</strong>
+                  <span className="pill">{agent.status}</span>
                 </div>
                 <p className="muted">
-                  active validation: {state.selectedPolicy.activeValidationAllowed ? "enabled" : "disabled"}
+                  {formatDuration(agent.durationMs)} · {agent.turns} turns
                 </p>
-                <p>{state.selectedPolicy.allowedExploitClasses.join(", ")}</p>
+                <p>{formatCurrency(agent.costUsd)}</p>
               </article>
-            ) : (
-              <p className="muted">Select a project to inspect and edit its policy.</p>
-            )}
+            )) ?? <p className="empty-copy">No agent data yet.</p>}
           </div>
         </section>
 
         <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Runners</p>
-              <h2>Runner Management</h2>
-            </div>
-          </div>
-          <div className="timeline">
-            {state.runners.map((runner) => (
-              <article key={runner.id} className="timeline-item">
-                <div className="card-topline">
-                  <strong>{runner.id}</strong>
-                  <span className="pill">{runner.status}</span>
-                </div>
-                <p>{runner.name}</p>
-                <p className="muted">{runner.endpoint ?? "no endpoint"}</p>
-                <p className="muted">
-                  {runner.mode} · {runner.managed ? "managed" : "attached"} · last seen {runner.lastSeenAt}
-                </p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Exploit packs</p>
-              <h2>Safe Exploit Packs</h2>
-            </div>
-          </div>
-          <div className="timeline">
-            {state.exploitPacks.map((pack) => (
-              <article key={pack.id} className="timeline-item">
-                <div className="card-topline">
-                  <strong>{pack.title}</strong>
-                  <span className="pill">{pack.proofType}</span>
-                </div>
-                <p>{pack.attackDomain}</p>
-                <p className="muted">{pack.permissionLevel}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Runs</p>
-              <h2>Recent Scans</h2>
-            </div>
-          </div>
-          <div className="timeline">
-            {state.scans.length === 0 ? (
-              <p className="muted">No scans have run yet.</p>
-            ) : (
-              state.scans.map((scan) => (
-                <article key={scan.id} className="timeline-item">
-                  <div className="card-topline">
-                    <strong>{scan.id}</strong>
-                    <span className="pill">{scan.status}</span>
-                  </div>
-                  <p className="muted">Project: {scan.projectId}</p>
-                  <p>{scan.phaseHistory.join(" -> ")}</p>
-                </article>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Evidence</p>
+              <p className="eyebrow">Result</p>
               <h2>Latest Findings</h2>
             </div>
-            {state.latestReport ? <span className="pill">Report ready</span> : null}
           </div>
           <div className="timeline">
-            {state.latestReport?.findings.length ? (
-              state.latestReport.findings.map((finding) => (
+            {state.workflowDetail?.findings.length ? (
+              state.workflowDetail.findings.map((finding) => (
                 <article key={finding.id} className="finding-card">
                   <div className="card-topline">
                     <strong>{finding.title}</strong>
@@ -348,7 +204,7 @@ export function AppShell({ state, controls }: AppShellProps) {
                 </article>
               ))
             ) : (
-              <p className="muted">Confirmed findings will appear here after a completed run.</p>
+              <p className="empty-copy">Confirmed findings will appear here after a run.</p>
             )}
           </div>
         </section>
@@ -356,30 +212,32 @@ export function AppShell({ state, controls }: AppShellProps) {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Coverage</p>
-              <h2>Coverage Matrix</h2>
+              <p className="eyebrow">Timeline</p>
+              <h2>Phase History</h2>
             </div>
           </div>
           <div className="timeline">
-            {state.latestReport?.report.coverageMatrix.length ? (
-              state.latestReport.report.coverageMatrix.map((item) => (
-                <article key={item.id} className="timeline-item">
-                  <div className="card-topline">
-                    <strong>{item.title}</strong>
-                    <span className="pill">{item.status}</span>
-                  </div>
-                  <p className="muted">proof: {item.proofType}</p>
-                </article>
-              ))
-            ) : (
-              <p className="muted">Coverage transparency will appear after the first report.</p>
-            )}
-            {state.latestReport?.report.unsupportedClasses.length ? (
-              <p className="muted">
-                Unsupported: {state.latestReport.report.unsupportedClasses.join(", ")}
-              </p>
-            ) : null}
+            {selectedWorkflow?.phaseHistory.map((phase) => (
+              <article key={`${phase.phase}-${phase.changedAt}`} className="timeline-item">
+                <div className="card-topline">
+                  <strong>{phase.phase}</strong>
+                  <span className="pill">{phase.changedAt}</span>
+                </div>
+              </article>
+            )) ?? <p className="empty-copy">No phase history yet.</p>}
           </div>
+        </section>
+
+        <section className="panel panel-wide">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Logs</p>
+              <h2>Workflow Logs</h2>
+            </div>
+          </div>
+          <pre className="log-view">
+            {state.workflowDetail?.logs.join("\n") ?? "Logs will appear here when a workflow is selected."}
+          </pre>
         </section>
       </main>
     </div>

@@ -84,7 +84,10 @@ export const providerDefinitionSchema = z.object({
   kind: providerKindSchema,
   label: z.string(),
   envKey: z.string(),
-  baseUrl: z.string().url()
+  baseUrl: z.string().url(),
+  authStrategies: z
+    .array(authStrategySchema)
+    .default(["browser-oauth", "device-auth", "manual"])
 });
 
 export const providerHealthSchema = providerDefinitionSchema.extend({
@@ -279,6 +282,53 @@ export const scanRunSchema = z.object({
   reportId: z.string().nullable()
 });
 
+export const workflowAgentSummarySchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  status: z.enum(["queued", "running", "completed", "failed", "stopped"]),
+  durationMs: z.number().nonnegative(),
+  turns: z.number().int().nonnegative(),
+  costUsd: z.number().nonnegative()
+});
+
+export const workflowSummarySchema = z.object({
+  id: z.string(),
+  scanRunId: z.string(),
+  reportId: z.string().nullable(),
+  status: z.enum(["queued", "running", "completed", "failed", "stopped"]),
+  currentPhase: scanPhaseSchema,
+  targetUrl: z.string().url(),
+  repoPath: z.string(),
+  workspace: z.string(),
+  reportPath: z.string(),
+  startedAt: z.string().datetime(),
+  endedAt: z.string().datetime().nullable(),
+  durationMs: z.number().nonnegative(),
+  totalCostUsd: z.number().nonnegative(),
+  totalTurns: z.number().int().nonnegative(),
+  agentCount: z.number().int().nonnegative(),
+  phaseHistory: z.array(phaseTransitionSchema),
+  agentBreakdown: z.array(workflowAgentSummarySchema)
+});
+
+export const workflowDetailSchema = z.object({
+  workflow: workflowSummarySchema,
+  report: reportSchema,
+  findings: z.array(confirmedFindingSchema),
+  logs: z.array(z.string())
+});
+
+export const workspaceSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.enum(["queued", "running", "completed", "failed", "stopped"]),
+  workflowCount: z.number().int().nonnegative(),
+  lastWorkflowId: z.string().nullable(),
+  lastRunAt: z.string().datetime().nullable(),
+  targetUrl: z.string().url(),
+  repoPath: z.string()
+});
+
 export type AttackDomain = z.infer<typeof attackDomainSchema>;
 export type ScanPhase = z.infer<typeof scanPhaseSchema>;
 export type EncryptionEnvelope = z.infer<typeof encryptionEnvelopeSchema>;
@@ -310,3 +360,7 @@ export type ConfirmedFinding = z.infer<typeof confirmedFindingSchema>;
 export type Report = z.infer<typeof reportSchema>;
 export type TargetApplication = z.infer<typeof targetApplicationSchema>;
 export type ScanRun = z.infer<typeof scanRunSchema>;
+export type WorkflowAgentSummary = z.infer<typeof workflowAgentSummarySchema>;
+export type WorkflowSummary = z.infer<typeof workflowSummarySchema>;
+export type WorkflowDetail = z.infer<typeof workflowDetailSchema>;
+export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;

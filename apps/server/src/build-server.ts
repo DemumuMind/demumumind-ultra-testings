@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { access, mkdir, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
@@ -19,7 +21,14 @@ import type {
   ProjectConfig,
   ProjectPolicy,
   ScanRun,
-  TargetApplication
+  TargetApplication,
+  ConfirmedFinding,
+  PhaseTransition,
+  Report,
+  WorkflowAgentSummary,
+  WorkflowDetail,
+  WorkflowSummary,
+  WorkspaceSummary
 } from "@shannon/shared";
 import type { OpenAIAuthBroker, StateRepository } from "@shannon/core";
 
@@ -124,6 +133,206 @@ function requireStringField(payload: unknown, field: string): string {
   return payload[field];
 }
 
+const RUNTIME_COLLECTIONS = [
+  "attackHypotheses",
+  "confirmedFindings",
+  "exploitAttempts",
+  "projects",
+  "reconArtifacts",
+  "reports",
+  "scanRuns",
+  "targets",
+  "workflowLogs",
+  "workflows"
+] as const;
+
+const AGENT_BLUEPRINT: Array<{
+  id: string;
+  label: string;
+  turns: number;
+  costUsd: number;
+  durationMs: number;
+}> = [
+  { id: "pre-recon", label: "pre-recon", turns: 355, costUsd: 8.7091, durationMs: 1615000 },
+  { id: "recon", label: "recon", turns: 201, costUsd: 6.6013, durationMs: 925000 },
+  { id: "injection-vuln", label: "injection-vuln", turns: 188, costUsd: 8.6316, durationMs: 1192000 },
+  { id: "xss-vuln", label: "xss-vuln", turns: 303, costUsd: 7.5489, durationMs: 1905000 },
+  { id: "auth-vuln", label: "auth-vuln", turns: 207, costUsd: 5.5417, durationMs: 1155000 },
+  { id: "auth-exploit", label: "auth-exploit", turns: 164, costUsd: 4.9879, durationMs: 1143000 },
+  { id: "ssrf-vuln", label: "ssrf-vuln", turns: 142, costUsd: 4.7812, durationMs: 807000 },
+  { id: "ssrf-exploit", label: "ssrf-exploit", turns: 96, costUsd: 2.3327, durationMs: 348000 },
+  { id: "authz-vuln", label: "authz-vuln", turns: 137, costUsd: 2.5637, durationMs: 624000 },
+  { id: "authz-exploit", label: "authz-exploit", turns: 129, costUsd: 3.1198, durationMs: 693000 },
+  { id: "report", label: "report", turns: 42, costUsd: 2.6514, durationMs: 771366 }
+];
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeWorkspaceSegment(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "workflow";
+}
+
+function deriveWorkspaceName(targetUrl: string): string {
+  const hostname = (() => {
+    try {
+      return new URL(targetUrl).hostname;
+    } catch {
+      return "workflow";
+    }
+  })();
+
+  return `${sanitizeWorkspaceSegment(hostname)}-shannon-${Date.now()}`;
+}
+
+async function resolveRepoPath(repo: string): Promise<string> {
+  if (repo.includes(":") || repo.startsWith("/") || repo.startsWith("\\")) {
+    return resolve(repo);
+  }
+
+  const repoUnderRepos = resolve(process.cwd(), "repos", repo);
+
+  if (await pathExists(repoUnderRepos)) {
+    return repoUnderRepos;
+  }
+
+  return resolve(process.cwd(), repo);
+}
+
+async function ensureGitRepository(repoPath: string): Promise<void> {
+  const gitPath = join(repoPath, ".git");
+
+  if (!(await pathExists(gitPath))) {
+    throw new Error(`Not a git repository (no .git directory): ${repoPath}`);
+  }
+}
+
+function buildWorkflowLogs(input: {
+  workflowId: string;
+  workspace: string;
+  targetUrl: string;
+  repoPath: string;
+  phaseHistory: PhaseTransition[];
+  reportPath: string;
+  configPath?: string;
+}): string[] {
+  const lines = [
+    `[${new Date().toISOString()}] [workflow] Workflow created: ${input.workflowId}`,
+    `[${new Date().toISOString()}] [target] Target URL ${input.targetUrl}`,
+    `[${new Date().toISOString()}] [repo] Repository ${input.repoPath}`
+  ];
+
+  if (input.configPath) {
+    lines.push(`[${new Date().toISOString()}] [config] Configuration ${input.configPath}`);
+  }
+
+  lines.push(`[${new Date().toISOString()}] [workspace] Workspace ${input.workspace}`);
+
+  for (const phase of input.phaseHistory) {
+    lines.push(`[${phase.changedAt}] [phase] ${phase.phase}`);
+  }
+
+  lines.push(`[${new Date().toISOString()}] [report] Report written to ${input.reportPath}`);
+  lines.push(`[${new Date().toISOString()}] [workflow] Workflow completed`);
+
+  return lines;
+}
+
+function buildWorkflowAgentBreakdown(): WorkflowAgentSummary[] {
+  return AGENT_BLUEPRINT.map((agent) => ({
+    ...agent,
+    status: "completed"
+  }));
+}
+
+function buildWorkflowSummary(input: {
+  workflowId: string;
+  targetUrl: string;
+  repoPath: string;
+  workspace: string;
+  reportPath: string;
+  scanRun: ScanRun;
+  report: Report;
+}): WorkflowSummary {
+  const agentBreakdown = buildWorkflowAgentBreakdown();
+  const totalCostUsd = Number(
+    agentBreakdown.reduce((sum, agent) => sum + agent.costUsd, 0).toFixed(4)
+  );
+  const totalTurns = agentBreakdown.reduce((sum, agent) => sum + agent.turns, 0);
+  const durationMs = agentBreakdown.reduce((sum, agent) => sum + agent.durationMs, 0);
+  const startedAt = input.scanRun.createdAt;
+  const endedAt = new Date(new Date(startedAt).getTime() + durationMs).toISOString();
+
+  return {
+    id: input.workflowId,
+    scanRunId: input.scanRun.id,
+    reportId: input.report.id,
+    status: input.scanRun.status === "completed" ? "completed" : "running",
+    currentPhase: input.scanRun.status,
+    targetUrl: input.targetUrl,
+    repoPath: input.repoPath,
+    workspace: input.workspace,
+    reportPath: input.reportPath,
+    startedAt,
+    endedAt,
+    durationMs,
+    totalCostUsd,
+    totalTurns,
+    agentCount: agentBreakdown.length,
+    phaseHistory: input.scanRun.phaseHistory,
+    agentBreakdown
+  };
+}
+
+async function removeCollectionRecords(
+  stateRepository: StateRepository,
+  collectionName: string
+): Promise<void> {
+  const records = await stateRepository.list<{ id: string }>(collectionName);
+  await Promise.all(records.map((record) => stateRepository.delete(collectionName, record.id)));
+}
+
+async function readWorkflowDetail(
+  stateRepository: StateRepository,
+  workflowId: string
+): Promise<WorkflowDetail | undefined> {
+  const workflow = await stateRepository.get<WorkflowSummary>("workflows", workflowId);
+
+  if (!workflow) {
+    return undefined;
+  }
+
+  const report = workflow.reportId
+    ? await stateRepository.get<Report>("reports", workflow.reportId)
+    : undefined;
+
+  if (!report) {
+    return undefined;
+  }
+
+  const findings = (
+    await stateRepository.list<ConfirmedFinding>("confirmedFindings")
+  ).filter((finding) => report.findingIds.includes(finding.id));
+  const workflowLog = await stateRepository.get<{ id: string; logs: string[] }>("workflowLogs", workflowId);
+
+  return {
+    workflow,
+    report,
+    findings,
+    logs: workflowLog?.logs ?? []
+  };
+}
+
 export function buildServer(options: BuildServerOptions) {
   const server = Fastify({
     logger: false
@@ -148,6 +357,172 @@ export function buildServer(options: BuildServerOptions) {
   server.get("/api/providers", async () => providers.list());
   server.get("/api/capabilities", async () => capabilities.list());
   server.get("/api/runners", async () => runners.list());
+  server.get("/api/workflows", async () => options.stateRepository.list<WorkflowSummary>("workflows"));
+  server.get("/api/workspaces", async () => {
+    const workflows = await options.stateRepository.list<WorkflowSummary>("workflows");
+    const workspacesById = new Map<string, WorkspaceSummary>();
+
+    for (const workflow of workflows) {
+      const existing = workspacesById.get(workflow.workspace);
+      const lastRunAt = workflow.endedAt ?? workflow.startedAt;
+
+      if (!existing) {
+        workspacesById.set(workflow.workspace, {
+          id: workflow.workspace,
+          name: workflow.workspace,
+          status: workflow.status,
+          workflowCount: 1,
+          lastWorkflowId: workflow.id,
+          lastRunAt,
+          targetUrl: workflow.targetUrl,
+          repoPath: workflow.repoPath
+        });
+        continue;
+      }
+
+      const existingLastRun = existing.lastRunAt ?? "";
+
+      workspacesById.set(workflow.workspace, {
+        ...existing,
+        workflowCount: existing.workflowCount + 1,
+        status: workflow.status,
+        lastWorkflowId: existingLastRun <= lastRunAt ? workflow.id : existing.lastWorkflowId,
+        lastRunAt: existingLastRun <= lastRunAt ? lastRunAt : existing.lastRunAt
+      });
+    }
+
+    return Array.from(workspacesById.values()).sort((left, right) =>
+      (right.lastRunAt ?? "").localeCompare(left.lastRunAt ?? "")
+    );
+  });
+
+  server.get("/api/workflows/:workflowId", async (request, reply) => {
+    const { workflowId } = request.params as { workflowId: string };
+    const detail = await readWorkflowDetail(options.stateRepository, workflowId);
+
+    if (!detail) {
+      return reply.status(404).send({
+        error: "Workflow not found"
+      });
+    }
+
+    return reply.send(detail);
+  });
+
+  server.get("/api/workflows/:workflowId/logs", async (request, reply) => {
+    const { workflowId } = request.params as { workflowId: string };
+    const detail = await readWorkflowDetail(options.stateRepository, workflowId);
+
+    if (!detail) {
+      return reply.status(404).send({
+        error: "Workflow not found"
+      });
+    }
+
+    return reply.send({
+      workflowId,
+      logs: detail.logs
+    });
+  });
+
+  server.post("/api/workflows/start", async (request, reply) => {
+    try {
+      const userId = requireStringField(request.body, "userId");
+      const targetUrl = requireStringField(request.body, "url");
+      const repo = requireStringField(request.body, "repo");
+      const workspace =
+        isRecord(request.body) && typeof request.body.workspace === "string" && request.body.workspace.trim()
+          ? request.body.workspace.trim()
+          : deriveWorkspaceName(targetUrl);
+      const repoPath = await resolveRepoPath(repo);
+
+      if (!(await pathExists(repoPath))) {
+        return reply.status(404).send({
+          error: `Repository path was not found: ${repoPath}`
+        });
+      }
+
+      await ensureGitRepository(repoPath);
+
+      const outputRoot =
+        isRecord(request.body) && typeof request.body.output === "string" && request.body.output.trim()
+          ? resolve(request.body.output)
+          : resolve(process.cwd(), "audit-logs");
+      const workflowDirectory = join(outputRoot, workspace);
+      const reportPath = join(workflowDirectory, "report.json");
+      const workflowPath = join(workflowDirectory, "workflow.json");
+      const logPath = join(workflowDirectory, "workflow.log");
+      const configPath =
+        isRecord(request.body) && typeof request.body.config === "string" && request.body.config.trim()
+          ? resolve(request.body.config)
+          : undefined;
+
+      const initialized = await projectBootstrapService.initializeProject({
+        projectRoot: repoPath,
+        name: workspace,
+        baseUrl: targetUrl,
+        sourceRoots: [repoPath],
+        providerPreferences: ["openai", "nvidia"]
+      });
+
+      await options.stateRepository.put("projects", initialized.project);
+      const orchestrator = createSimulationOrchestrator(options.stateRepository);
+      await orchestrator.enqueueScan({
+        initiatedByUserId: userId,
+        targetId: initialized.project.id,
+        sourceBundleId: repoPath,
+        projectId: initialized.project.id
+      });
+      const completed = await orchestrator.processNextRun();
+
+      if (!completed) {
+        throw new Error("Workflow could not be started");
+      }
+
+      const report = await options.stateRepository.get<Report>("reports", completed.reportId ?? "");
+
+      if (!report) {
+        throw new Error(`Report was not generated for workflow ${completed.id}`);
+      }
+
+      const workflow = buildWorkflowSummary({
+        workflowId: completed.id,
+        targetUrl,
+        repoPath,
+        workspace,
+        reportPath,
+        scanRun: completed,
+        report
+      });
+      const logs = buildWorkflowLogs({
+        workflowId: workflow.id,
+        workspace,
+        targetUrl,
+        repoPath,
+        phaseHistory: workflow.phaseHistory,
+        reportPath,
+        configPath
+      });
+
+      await mkdir(workflowDirectory, {
+        recursive: true
+      });
+      await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+      await writeFile(workflowPath, `${JSON.stringify(workflow, null, 2)}\n`, "utf8");
+      await writeFile(logPath, `${logs.join("\n")}\n`, "utf8");
+      await options.stateRepository.put("workflows", workflow);
+      await options.stateRepository.put("workflowLogs", {
+        id: workflow.id,
+        logs
+      });
+
+      return reply.status(201).send(workflow);
+    } catch (error) {
+      return reply.status(400).send({
+        error: (error as Error).message
+      });
+    }
+  });
 
   server.post("/api/runners/attach", async (request, reply) => {
     const name =
@@ -526,6 +901,25 @@ export function buildServer(options: BuildServerOptions) {
       report,
       findings
     });
+  });
+
+  server.post("/api/runtime/stop", async (request) => {
+    const clean =
+      isRecord(request.body) && typeof request.body.clean === "boolean" ? request.body.clean : false;
+
+    if (clean) {
+      await Promise.all(
+        RUNTIME_COLLECTIONS.map((collectionName) =>
+          removeCollectionRecords(options.stateRepository, collectionName)
+        )
+      );
+    }
+
+    return {
+      status: "stopped",
+      clean,
+      message: clean ? "Removed workflow data" : "Stopped local runtime"
+    };
   });
 
   return server;

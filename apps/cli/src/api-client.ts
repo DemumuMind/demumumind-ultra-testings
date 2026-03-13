@@ -1,3 +1,5 @@
+import type { WorkflowDetail, WorkflowSummary, WorkspaceSummary } from "@shannon/shared";
+
 export interface BrowserLoginResult {
   sessionId: string;
   authorizationUrl: string;
@@ -26,7 +28,11 @@ export type DeviceLoginPollResult =
     };
 
 export interface ShannonApiClient {
-  startBrowserLogin(userId: string, redirectUri?: string): Promise<BrowserLoginResult>;
+  startBrowserLogin(
+    userId: string,
+    provider: "openai" | "nvidia",
+    redirectUri?: string
+  ): Promise<BrowserLoginResult>;
   completeBrowserLogin(input: {
     userId: string;
     code: string;
@@ -37,7 +43,10 @@ export interface ShannonApiClient {
       name: string;
     };
   }>;
-  startDeviceLogin(userId: string): Promise<DeviceLoginStartResult>;
+  startDeviceLogin(
+    userId: string,
+    provider: "openai" | "nvidia"
+  ): Promise<DeviceLoginStartResult>;
   pollDeviceLogin(input: { userId: string; sessionId: string }): Promise<DeviceLoginPollResult>;
   logout(userId: string): Promise<void>;
   getConnection(userId: string): Promise<{
@@ -53,105 +62,32 @@ export interface ShannonApiClient {
       name: string;
     } | null;
   }>;
-  createTarget(input: {
-    name: string;
-    baseUrl: string;
-    sourceBundlePath: string;
-    verificationMode: "passive" | "simulation";
-  }): Promise<{
-    id: string;
-    name: string;
-    baseUrl: string;
-    sourceBundlePath: string;
-    verificationMode: "passive" | "simulation";
-  }>;
-  runScan(input: { userId: string; targetId?: string; projectId?: string }): Promise<{
-    id: string;
-    status: string;
-    targetId: string;
-    projectId?: string | null;
-  }>;
-  getReport(scanRunId: string): Promise<{
-    report: {
-      id: string;
-      scanRunId: string;
-      findingIds: string[];
-      coverageMatrix?: Array<{
-        id: string;
-        title: string;
-        status: string;
-        proofType: string;
-      }>;
-      unsupportedClasses?: string[];
-    };
-    findings: unknown[];
-  }>;
-  getDoctorReport(): Promise<{
-    status: string;
-    checks: Array<{
-      id: string;
-      status: string;
-      summary: string;
-    }>;
-  }>;
   getProviders(): Promise<
     Array<{
-      kind: string;
-      label?: string;
+      kind: "openai" | "nvidia";
+      label: string;
       status: string;
+      authStrategies: string[];
     }>
   >;
-  getCapabilities(): Promise<
-    Array<{
-      id: string;
-      name?: string;
-      category?: string;
-      permissionLevel: string;
-    }>
-  >;
-  initProject(input: {
-    projectRoot: string;
-    name: string;
-    baseUrl: string;
-    sourceRoots: string[];
-    providerPreferences?: Array<"openai" | "nvidia">;
-  }): Promise<{
-    project: {
-      id: string;
-      name: string;
-      proofMode: string;
-    };
-    configPath: string;
-    policyPath: string;
+  startWorkflow(input: {
+    userId: string;
+    url: string;
+    repo: string;
+    config?: string;
+    output?: string;
+    workspace?: string;
+  }): Promise<WorkflowSummary>;
+  getWorkflow(workflowId: string): Promise<WorkflowDetail>;
+  getWorkflowLogs(workflowId: string): Promise<{
+    workflowId: string;
+    logs: string[];
   }>;
-  getProjects(): Promise<
-    Array<{
-      id: string;
-      name: string;
-      baseUrl?: string;
-    }>
-  >;
-  getPolicy(projectId: string): Promise<{
-    activeValidationAllowed: boolean;
-    destructiveChecksEnabled: boolean;
-    allowedExploitClasses: string[];
-  }>;
-  updatePolicy(
-    projectId: string,
-    input: {
-      activeValidationAllowed?: boolean;
-      destructiveChecksEnabled?: boolean;
-      allowedExploitClasses?: string[];
-    }
-  ): Promise<{
-    activeValidationAllowed: boolean;
-    destructiveChecksEnabled: boolean;
-    allowedExploitClasses: string[];
-  }>;
-  attachRunner(input?: { name?: string }): Promise<{
-    id: string;
-    mode: string;
-    status: string;
+  getWorkspaces(): Promise<WorkspaceSummary[]>;
+  stopRuntime(input: { clean?: boolean }): Promise<{
+    status: "stopped";
+    clean: boolean;
+    message: string;
   }>;
 }
 
@@ -172,9 +108,14 @@ async function readJsonOrThrow<T>(response: Response): Promise<T> {
 export class FetchShannonApiClient implements ShannonApiClient {
   constructor(private readonly baseUrl: string) {}
 
-  async startBrowserLogin(userId: string, redirectUri?: string): Promise<BrowserLoginResult> {
+  async startBrowserLogin(
+    userId: string,
+    provider: "openai" | "nvidia",
+    redirectUri?: string
+  ): Promise<BrowserLoginResult> {
     return this.post("/api/auth/browser/start", {
       userId,
+      provider,
       redirectUri
     });
   }
@@ -192,9 +133,13 @@ export class FetchShannonApiClient implements ShannonApiClient {
     return this.post("/api/auth/browser/callback", input);
   }
 
-  async startDeviceLogin(userId: string): Promise<DeviceLoginStartResult> {
+  async startDeviceLogin(
+    userId: string,
+    provider: "openai" | "nvidia"
+  ): Promise<DeviceLoginStartResult> {
     return this.post("/api/auth/device/start", {
-      userId
+      userId,
+      provider
     });
   }
 
@@ -238,144 +183,49 @@ export class FetchShannonApiClient implements ShannonApiClient {
     }>(`/api/auth/status/${userId}`);
   }
 
-  async createTarget(input: {
-    name: string;
-    baseUrl: string;
-    sourceBundlePath: string;
-    verificationMode: "passive" | "simulation";
-  }): Promise<{
-    id: string;
-    name: string;
-    baseUrl: string;
-    sourceBundlePath: string;
-    verificationMode: "passive" | "simulation";
-  }> {
-    return this.post("/api/targets", input);
-  }
-
-  async runScan(input: {
-    userId: string;
-    targetId?: string;
-    projectId?: string;
-  }): Promise<{
-    id: string;
-    status: string;
-    targetId: string;
-    projectId?: string | null;
-  }> {
-    return this.post("/api/scans", input);
-  }
-
-  async getReport(scanRunId: string) {
-    const response = await fetch(new URL(`/api/reports/${scanRunId}`, this.baseUrl), {
-      method: "GET"
-    });
-    return readJsonOrThrow<{
-      report: {
-        id: string;
-        scanRunId: string;
-        findingIds: string[];
-        coverageMatrix?: Array<{
-          id: string;
-          title: string;
-          status: string;
-          proofType: string;
-        }>;
-        unsupportedClasses?: string[];
-      };
-      findings: unknown[];
-    }>(response);
-  }
-
-  async getDoctorReport() {
-    return this.get<{
-      status: string;
-      checks: Array<{
-        id: string;
-        status: string;
-        summary: string;
-      }>;
-    }>("/api/bootstrap/doctor");
-  }
-
   async getProviders() {
     return this.get<
       Array<{
-        kind: string;
-        label?: string;
+        kind: "openai" | "nvidia";
+        label: string;
         status: string;
+        authStrategies: string[];
       }>
     >("/api/providers");
   }
 
-  async getCapabilities() {
-    return this.get<
-      Array<{
-        id: string;
-        name?: string;
-        category?: string;
-        permissionLevel: string;
-      }>
-    >("/api/capabilities");
+  async startWorkflow(input: {
+    userId: string;
+    url: string;
+    repo: string;
+    config?: string;
+    output?: string;
+    workspace?: string;
+  }): Promise<WorkflowSummary> {
+    return this.post("/api/workflows/start", input);
   }
 
-  async initProject(input: {
-    projectRoot: string;
-    name: string;
-    baseUrl: string;
-    sourceRoots: string[];
-    providerPreferences?: Array<"openai" | "nvidia">;
-  }) {
-    return this.post<{
-      project: {
-        id: string;
-        name: string;
-        proofMode: string;
-      };
-      configPath: string;
-      policyPath: string;
-    }>("/api/projects/init", input);
+  async getWorkflow(workflowId: string): Promise<WorkflowDetail> {
+    return this.get<WorkflowDetail>(`/api/workflows/${workflowId}`);
   }
 
-  async getProjects() {
-    return this.get<
-      Array<{
-        id: string;
-        name: string;
-        baseUrl?: string;
-      }>
-    >("/api/projects");
-  }
-
-  async getPolicy(projectId: string) {
+  async getWorkflowLogs(workflowId: string) {
     return this.get<{
-      activeValidationAllowed: boolean;
-      destructiveChecksEnabled: boolean;
-      allowedExploitClasses: string[];
-    }>(`/api/projects/${projectId}/policy`);
+      workflowId: string;
+      logs: string[];
+    }>(`/api/workflows/${workflowId}/logs`);
   }
 
-  async updatePolicy(
-    projectId: string,
-    input: {
-      activeValidationAllowed?: boolean;
-      destructiveChecksEnabled?: boolean;
-      allowedExploitClasses?: string[];
-    }
-  ) {
-    return this.patch<{
-      activeValidationAllowed: boolean;
-      destructiveChecksEnabled: boolean;
-      allowedExploitClasses: string[];
-    }>(`/api/projects/${projectId}/policy`, input);
+  async getWorkspaces(): Promise<WorkspaceSummary[]> {
+    return this.get<WorkspaceSummary[]>("/api/workspaces");
   }
 
-  async attachRunner(input?: { name?: string }) {
+  async stopRuntime(input: { clean?: boolean }) {
     return this.post<{
-      id: string;
-      mode: string;
-      status: string;
-    }>("/api/runners/attach", input ?? {});
+      status: "stopped";
+      clean: boolean;
+      message: string;
+    }>("/api/runtime/stop", input);
   }
 
   private async get<T>(path: string): Promise<T> {
@@ -386,16 +236,8 @@ export class FetchShannonApiClient implements ShannonApiClient {
   }
 
   private async post<T>(path: string, payload: unknown): Promise<T> {
-    return this.sendJson("POST", path, payload);
-  }
-
-  private async patch<T>(path: string, payload: unknown): Promise<T> {
-    return this.sendJson("PATCH", path, payload);
-  }
-
-  private async sendJson<T>(method: "POST" | "PATCH", path: string, payload: unknown): Promise<T> {
     const response = await fetch(new URL(path, this.baseUrl), {
-      method,
+      method: "POST",
       headers: {
         "content-type": "application/json"
       },

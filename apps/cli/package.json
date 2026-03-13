@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
+    "demumu": "./dist/index.js",
     "demumumind": "./dist/index.js",
     "shannon-lite-plus": "./dist/index.js"
   },

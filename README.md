@@ -1,75 +1,23 @@
-# DemumuMind Ultra Testings
+# Demumu Shannon
 
-Windows-first all-in-one AppSec platform for white-box testing of web applications and APIs.
+Shannon-style workflow runner for white-box AppSec testing of web applications and APIs.
 
-`DemumuMind Ultra Testings` combines a slash-driven CLI, a local daemon, a desktop shell, and a web control plane into one workflow for project bootstrap, scan orchestration, evidence collection, and correlated security reporting.
+This repository is now centered on a CLI-first run model:
+- start a workflow from the terminal
+- inspect logs and workflow details from the terminal
+- review the same run in a statistics-focused web dashboard
 
-## Самый простой путь
+The first implementation wave keeps the runtime in TypeScript and constrains provider support to:
+- `OpenAI`
+- `NVIDIA`
 
-```powershell
-git clone https://github.com/DemumuMind/demumumind-ultra-testings.git
-cd demumumind-ultra-testings
-corepack enable
-pnpm install
-pnpm build
-pnpm exec demumumind /doctor
-```
-
-## Why
-
-- Windows-first runtime without mandatory Docker or WSL
-- One product instead of separate Lite/Pro editions
-- White-box coverage for Web, REST, and GraphQL projects
-- Safe-by-default validation with explicit policy gates for stronger checks
-- Local-first control plane for projects, runners, providers, policies, and reports
-
-## Platform Surfaces
-
-### CLI
-
-Primary binary: `demumumind`
-
-Supported interaction styles:
-
-- From the cloned repository, run the CLI as `pnpm exec demumumind ...`
-- Slash commands such as `pnpm exec demumumind /doctor`, `pnpm exec demumumind /scan start`, `pnpm exec demumumind /report open`
-- Standard automation commands such as `pnpm exec demumumind doctor`, `pnpm exec demumumind project init`, `pnpm exec demumumind scan run`
-- Shortcut scripts also exist at the repo root: `pnpm run doctor` and `pnpm cli -- /doctor`
-
-### Local Daemon
-
-Background service: `demumumindd`
-
-- Serves the local API at `http://127.0.0.1:<port>/api`
-- Stores project state, scan state, runner registry, and artifacts
-- Powers the desktop shell and the browser-based control plane
-
-### Desktop Shell
-
-- Electron-based local shell for Windows
-- Wraps the existing web control plane instead of introducing a separate UI stack
-- Supports project management, scan execution, and report navigation
-
-### Web Control Plane
-
-- Localhost-hosted React app for operator auth, project policy, runner management, and report review
-- Exposes the same control plane used by the desktop shell
+Browser/device auth is the preferred connection path. Environment variables remain available as a fallback for headless and CI usage.
 
 ## Quick Start
 
-### Prerequisites
+### 1. Clone and build
 
-- Windows
-- Node.js 22+
-- Corepack
-- Optional provider keys:
-  - `OPENAI_API_KEY`
-  - `NVIDIA_API_KEY`
-  - `NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1`
-
-### Install And Build
-
-```powershell
+```bash
 git clone https://github.com/DemumuMind/demumumind-ultra-testings.git
 cd demumumind-ultra-testings
 corepack enable
@@ -77,105 +25,206 @@ pnpm install
 pnpm build
 ```
 
-If `pnpm` is missing, run `corepack enable` first instead of installing a separate global package manager manually.
+### 2. Configure providers
 
-### Run Doctor
+`demumu start` automatically boots the daemon when it is not already running.
 
-```powershell
-pnpm exec demumumind /doctor
+- For local HTTP URLs, the CLI starts the bundled server directly.
+- If `apps/server/dist/index.js` is missing, the CLI falls back to starting `apps/server/src/index.ts` through `tsx`.
+- For custom or remote `DEMUMUMIND_SERVER_URL` values, set `DEMUMUMIND_SERVER_BOOTSTRAP_COMMAND` to teach the CLI how to start that daemon.
+
+Preferred path:
+
+```bash
+./demumu login --device-auth --provider openai
 ```
 
-### First Real Run
+Fallback path for headless and CI:
 
-```powershell
-pnpm exec demumumind /project init --name "Demo project" --base-url http://127.0.0.1:3000 --project-root . --source-root .
-pnpm exec demumumind /scan start --project-id <project-id>
+```bash
+export OPENAI_API_KEY="your-api-key"
+export NVIDIA_API_KEY="your-api-key"
+export NVIDIA_BASE_URL="https://integrate.api.nvidia.com/v1"
 ```
 
-### Local Control Plane
+### 3. Run a workflow
 
-```powershell
-pnpm dev:server
+Place the target repository inside `./repos/` and use the folder name as `REPO`.
+
+```bash
+./demumu start URL=https://example.com REPO=repo-name
+```
+
+Optional arguments:
+
+```bash
+./demumu start URL=https://example.com REPO=repo-name WORKSPACE=q1-audit
+./demumu start URL=https://example.com REPO=repo-name OUTPUT=./audit-logs
+./demumu start URL=https://example.com REPO=repo-name CONFIG=./configs/my-config.yaml
+```
+
+### 4. Monitor the workflow
+
+```bash
+./demumu logs ID=<workflow-id>
+./demumu query ID=<workflow-id>
+./demumu workspaces
+```
+
+### 5. Stop the local runtime
+
+```bash
+./demumu stop
+./demumu stop CLEAN=true
+```
+
+## Command Surface
+
+Primary Shannon-style commands:
+
+```text
+demumu start URL=<url> REPO=<name> [CONFIG=<path>] [OUTPUT=<path>] [WORKSPACE=<name>]
+demumu logs ID=<workflow-id>
+demumu query ID=<workflow-id>
+demumu stop [CLEAN=true]
+demumu workspaces
+demumu help
+```
+
+Provider connection helpers:
+
+```text
+demumu login --device-auth --provider openai
+demumu login --provider nvidia
+demumu logout
+demumu whoami
+```
+
+Compatibility notes:
+- `doctor` remains as a lightweight compatibility command and prints provider readiness.
+- older `pnpm exec demumumind ...` flows are no longer the primary documented path.
+- `DEMUMUMIND_SERVER_BOOTSTRAP_COMMAND` can be used to auto-start a non-default daemon target before `start`.
+
+## Web Dashboard
+
+Run the dashboard in a second terminal:
+
+```bash
 pnpm dev:web
 ```
 
-### What Project Bootstrap Creates
+The web app is intentionally narrow in scope:
+- workflow list
+- workspace list
+- workflow detail summary
+- phase history
+- log view
+- findings and agent breakdown
 
-- `demumumind.config.yaml`
-- `policies/default.yaml`
+It is no longer the primary place for broad control-plane administration in v1.
 
-### Start A Scan
+## Platform Support
 
-```powershell
-pnpm exec demumumind /scan start --project-id <project-id>
-```
-
-### Open The Report
-
-```powershell
-pnpm exec demumumind /report open --scan-run-id <scan-id>
-```
-
-## Scanning Model
-
-Current v1 pipeline:
-
-1. Project intake
-2. Environment doctor
-3. Source indexing and framework detection
-4. Recon and surface mapping
-5. Static reasoning
-6. Dynamic hypothesis generation
-7. Safe exploit validation
-8. Correlated reporting
-
-## Safe Proof And Policy Gates
-
-The platform does not mark findings as confirmed without evidence.
-
-- `Safe Proof` is the default validation mode
-- Stronger or state-changing checks require explicit project policy
-- Unsupported classes remain visible in the coverage matrix instead of being reported as passed
-
-## Capability Areas
-
-- Recon and code indexing
-- Auth flow automation
-- SAST-lite and secret discovery
-- Dependency inventory
-- HTTP and API testing adapters
-- Static analyzer and native scanner adapters
-- Safe exploit packs for auth, authorization, injection, SSRF, XSS, GraphQL, and business-logic checks
-
-## Windows Packaging
-
-Build the desktop package:
+### PowerShell
 
 ```powershell
-pnpm package:desktop
+corepack enable
+pnpm install
+pnpm build
+.\demumu.ps1 start URL=https://example.com REPO=repo-name
 ```
 
-Bootstrap a Windows workstation:
+### CMD
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\install-demumumind.ps1
+```cmd
+corepack enable
+pnpm install
+pnpm build
+demumu.cmd start URL=https://example.com REPO=repo-name
 ```
 
-Use the PowerShell installer as a guided bootstrap option. The primary documented path for CLI setup remains the manual `git clone -> corepack enable -> pnpm install -> pnpm build -> pnpm exec demumumind /doctor` flow above.
+### Git Bash / Shell
+
+```bash
+corepack enable
+pnpm install
+pnpm build
+./demumu start URL=https://example.com REPO=repo-name
+```
+
+### WSL
+
+```bash
+corepack enable
+pnpm install
+pnpm build
+./demumu start URL=https://example.com REPO=repo-name
+```
+
+For WSL, keep the repository inside the Linux filesystem when possible for better tooling and file performance.
+
+## Repository Layout for Targets
+
+The CLI expects target repositories under `./repos/` by default.
+
+Examples:
+
+```bash
+git clone https://github.com/your-org/your-repo.git ./repos/your-repo
+./demumu start URL=https://your-app.com REPO=your-repo
+```
+
+```bash
+mkdir -p ./repos/your-app
+git clone https://github.com/your-org/frontend.git ./repos/your-app/frontend
+git clone https://github.com/your-org/backend.git ./repos/your-app/backend
+```
+
+The target path must be a git repository. If `.git` is missing, workflow start fails early with a clear validation error.
+
+## Providers
+
+Only these providers are supported in v1:
+- `OpenAI`
+- `NVIDIA`
+
+Provider metadata is intentionally fixed in the product surface and dashboard.
+
+Preferred auth order:
+1. Browser OAuth
+2. Device authorization
+3. Manual environment variables
+
+## Migration from the Old CLI
+
+Old:
+
+```bash
+pnpm exec demumumind /project init ...
+pnpm exec demumumind /scan start --project-id ...
+pnpm exec demumumind /report open --scan-run-id ...
+```
+
+New primary flow:
+
+```bash
+./demumu start URL=https://example.com REPO=repo-name
+./demumu logs ID=<workflow-id>
+./demumu query ID=<workflow-id>
+```
+
+The old slash-driven control-plane workflow is no longer the main product story.
 
 ## Verification
 
-```powershell
+```bash
 pnpm test
 pnpm typecheck
 pnpm build
 ```
 
-## Repository
+## Rust
 
-- Issues: [GitHub Issues](https://github.com/DemumuMind/demumumind-ultra-testings/issues)
-- Source: [DemumuMind/demumumind-ultra-testings](https://github.com/DemumuMind/demumumind-ultra-testings)
+Rust is intentionally deferred from the first implementation wave.
 
-## Status
-
-This repository currently contains the implemented foundation for the unified Windows-first DemumuMind platform: CLI, local daemon, desktop shell, web control plane, capability registry, safe exploit packs, and Windows packaging scripts.
+The current codebase keeps clean launcher and runtime boundaries so native Rust helpers can be added later for performance-sensitive tasks without rewriting the v1 product around Rust today.

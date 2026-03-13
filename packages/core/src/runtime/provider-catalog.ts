@@ -17,13 +17,15 @@ export class ProviderCatalogService {
         kind: "openai",
         label: "OpenAI",
         envKey: "OPENAI_API_KEY",
-        baseUrl: "https://api.openai.com/v1"
+        baseUrl: "https://api.openai.com/v1",
+        authStrategies: ["browser-oauth", "device-auth", "manual"]
       },
       {
         kind: "nvidia",
         label: "NVIDIA",
         envKey: "NVIDIA_API_KEY",
-        baseUrl: this.env.NVIDIA_BASE_URL ?? "https://integrate.api.nvidia.com/v1"
+        baseUrl: this.env.NVIDIA_BASE_URL ?? "https://integrate.api.nvidia.com/v1",
+        authStrategies: ["browser-oauth", "device-auth", "manual"]
       }
     ];
   }

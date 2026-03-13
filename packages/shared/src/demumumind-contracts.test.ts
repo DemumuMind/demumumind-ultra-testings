@@ -1,7 +1,10 @@
 import {
   confirmedFindingSchema,
+  providerHealthSchema,
   projectConfigSchema,
-  reportSchema
+  reportSchema,
+  workflowDetailSchema,
+  workflowSummarySchema
 } from "./index.js";
 
 describe("DemumuMind shared contracts", () => {
@@ -91,5 +94,115 @@ describe("DemumuMind shared contracts", () => {
     expect(report.exploitPacks[0]?.id).toBe("graphql-safe-pack");
     expect(report.coverageMatrix).toHaveLength(2);
     expect(report.unsupportedClasses).toContain("mobile-thick-client");
+  });
+
+  test("parses a Shannon-style workflow summary for dashboard statistics", () => {
+    const workflow = workflowSummarySchema.parse({
+      id: "workflow-1",
+      scanRunId: "scan-1",
+      reportId: "report-1",
+      status: "completed",
+      currentPhase: "completed",
+      targetUrl: "http://localhost:3001",
+      repoPath: "C:/demo/repos/demo-app",
+      workspace: "demo-workspace",
+      reportPath: "./audit-logs/demo-workspace/report.json",
+      startedAt: "2026-02-14T15:55:40.040Z",
+      endedAt: "2026-02-14T19:46:37.160Z",
+      durationMs: 13857072,
+      totalCostUsd: 57.4691,
+      totalTurns: 2093,
+      agentCount: 11,
+      phaseHistory: [
+        {
+          phase: "queued",
+          changedAt: "2026-02-14T15:55:40.040Z"
+        },
+        {
+          phase: "completed",
+          changedAt: "2026-02-14T19:46:37.160Z"
+        }
+      ],
+      agentBreakdown: [
+        {
+          id: "pre-recon",
+          label: "pre-recon",
+          status: "completed",
+          durationMs: 1615000,
+          turns: 355,
+          costUsd: 8.7091
+        }
+      ]
+    });
+
+    expect(workflow.workspace).toBe("demo-workspace");
+    expect(workflow.agentCount).toBe(11);
+    expect(workflow.agentBreakdown[0]?.label).toBe("pre-recon");
+  });
+
+  test("parses workflow details and provider metadata restricted to OpenAI and NVIDIA", () => {
+    const detail = workflowDetailSchema.parse({
+      workflow: {
+        id: "workflow-1",
+        scanRunId: "scan-1",
+        reportId: "report-1",
+        status: "completed",
+        currentPhase: "completed",
+        targetUrl: "http://localhost:3001",
+        repoPath: "C:/demo/repos/demo-app",
+        workspace: "demo-workspace",
+        reportPath: "./audit-logs/demo-workspace/report.json",
+        startedAt: "2026-02-14T15:55:40.040Z",
+        endedAt: "2026-02-14T19:46:37.160Z",
+        durationMs: 13857072,
+        totalCostUsd: 57.4691,
+        totalTurns: 2093,
+        agentCount: 11,
+        phaseHistory: [
+          {
+            phase: "queued",
+            changedAt: "2026-02-14T15:55:40.040Z"
+          },
+          {
+            phase: "completed",
+            changedAt: "2026-02-14T19:46:37.160Z"
+          }
+        ],
+        agentBreakdown: [
+          {
+            id: "report",
+            label: "report",
+            status: "completed",
+            durationMs: 771366,
+            turns: 42,
+            costUsd: 2.6514
+          }
+        ]
+      },
+      report: {
+        id: "report-1",
+        scanRunId: "scan-1",
+        findingIds: ["finding-1"],
+        generatedAt: "2026-02-14T19:46:37.160Z",
+        exploitPacks: [],
+        coverageMatrix: [],
+        unsupportedClasses: []
+      },
+      findings: [],
+      logs: ["[2026-02-14 19:46:37] [workflow] Workflow completed"]
+    });
+
+    const provider = providerHealthSchema.parse({
+      kind: "openai",
+      label: "OpenAI",
+      envKey: "OPENAI_API_KEY",
+      baseUrl: "https://api.openai.com/v1",
+      status: "configured",
+      authStrategies: ["browser-oauth", "device-auth", "manual"]
+    });
+
+    expect(detail.logs[0]).toContain("Workflow completed");
+    expect(provider.kind).toBe("openai");
+    expect(provider.authStrategies[0]).toBe("browser-oauth");
   });
 });

@@ -2,129 +2,146 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AppShell } from "./app-shell.js";
 
 describe("AppShell", () => {
-  test("renders the major dashboard sections and recent findings", () => {
+  test("renders a workflow dashboard and details without the old control-plane sections", () => {
     const markup = renderToStaticMarkup(
       <AppShell
         state={{
-          operatorId: "local-cli-user",
-          connectionEmail: "analyst@example.com",
           authState: "connected",
-          doctorStatus: "ready",
-          projects: [
-            {
-              id: "project-1",
-              name: "Demo app",
-              baseUrl: "http://localhost:3001",
-              sourceRoots: ["C:/demo/source"],
-              proofMode: "safe"
-            }
-          ],
+          connectionEmail: "analyst@example.com",
           providers: [
             {
               kind: "openai",
-              status: "configured"
+              label: "OpenAI",
+              status: "configured",
+              authStrategies: ["browser-oauth", "device-auth", "manual"]
             },
             {
               kind: "nvidia",
-              status: "missing-key"
+              label: "NVIDIA",
+              status: "missing-key",
+              authStrategies: ["browser-oauth", "device-auth", "manual"]
             }
           ],
-          capabilities: [
+          workflows: [
             {
-              id: "report-synthesis",
-              category: "core",
-              permissionLevel: "safe"
-            }
-          ],
-          exploitPacks: [
-            {
-              id: "graphql-safe-pack",
-              title: "GraphQL Safe Pack",
-              attackDomain: "graphql",
-              proofType: "safe",
-              permissionLevel: "safe"
-            }
-          ],
-          selectedPolicy: {
-            activeValidationAllowed: true,
-            destructiveChecksEnabled: false,
-            allowedExploitClasses: ["auth-safe", "graphql-introspection"]
-          },
-          runners: [
-            {
-              id: "runner-1",
-              name: "Local Runner",
-              mode: "local",
-              status: "ready",
-              endpoint: "http://127.0.0.1:4000/api",
-              managed: true,
-              lastSeenAt: "2026-03-13T13:00:00.000Z"
-            }
-          ],
-          scans: [
-            {
-              id: "scan-1",
+              id: "workflow-1",
               status: "completed",
-              projectId: "project-1",
+              currentPhase: "completed",
+              targetUrl: "http://localhost:3001",
+              repoPath: "C:/demo/repos/demo-app",
+              workspace: "demo-workspace",
+              reportPath: "./audit-logs/demo-workspace/report.json",
+              durationMs: 13857072,
+              totalCostUsd: 57.4691,
+              totalTurns: 2093,
+              agentCount: 11,
+              startedAt: "2026-02-14T15:55:40.040Z",
+              endedAt: "2026-02-14T19:46:37.160Z",
               phaseHistory: [
-                "project-intake",
-                "environment-doctor",
-                "source-indexing",
-                "recon-surface",
-                "static-reasoning",
-                "dynamic-validation",
-                "reporting",
-                "completed"
+                {
+                  phase: "queued",
+                  changedAt: "2026-02-14T15:55:40.040Z"
+                },
+                {
+                  phase: "completed",
+                  changedAt: "2026-02-14T19:46:37.160Z"
+                }
+              ],
+              agentBreakdown: [
+                {
+                  id: "pre-recon",
+                  label: "pre-recon",
+                  status: "completed",
+                  durationMs: 1615000,
+                  turns: 355,
+                  costUsd: 8.7091
+                }
               ]
             }
           ],
-          latestReport: {
+          workspaces: [
+            {
+              id: "demo-workspace",
+              name: "demo-workspace",
+              status: "completed",
+              workflowCount: 1,
+              lastWorkflowId: "workflow-1",
+              lastRunAt: "2026-02-14T19:46:37.160Z",
+              targetUrl: "http://localhost:3001",
+              repoPath: "C:/demo/repos/demo-app"
+            }
+          ],
+          selectedWorkflowId: "workflow-1",
+          workflowDetail: {
+            workflow: {
+              id: "workflow-1",
+              status: "completed",
+              currentPhase: "completed",
+              targetUrl: "http://localhost:3001",
+              repoPath: "C:/demo/repos/demo-app",
+              workspace: "demo-workspace",
+              reportPath: "./audit-logs/demo-workspace/report.json",
+              durationMs: 13857072,
+              totalCostUsd: 57.4691,
+              totalTurns: 2093,
+              agentCount: 11,
+              startedAt: "2026-02-14T15:55:40.040Z",
+              endedAt: "2026-02-14T19:46:37.160Z",
+              phaseHistory: [
+                {
+                  phase: "queued",
+                  changedAt: "2026-02-14T15:55:40.040Z"
+                },
+                {
+                  phase: "completed",
+                  changedAt: "2026-02-14T19:46:37.160Z"
+                }
+              ],
+              agentBreakdown: [
+                {
+                  id: "pre-recon",
+                  label: "pre-recon",
+                  status: "completed",
+                  durationMs: 1615000,
+                  turns: 355,
+                  costUsd: 8.7091
+                }
+              ]
+            },
             report: {
               id: "report-1",
               scanRunId: "scan-1",
-              findingIds: ["finding-1"],
-              coverageMatrix: [
-                {
-                  id: "graphql-abuse",
-                  title: "GraphQL abuse paths",
-                  status: "supported",
-                  proofType: "safe"
-                }
-              ],
-              unsupportedClasses: ["mobile-thick-client"]
+              findingIds: ["finding-1"]
             },
             findings: [
               {
                 id: "finding-1",
-                attackDomain: "graphql",
-                title: "GraphQL introspection exposed to anonymous users",
-                proofOfImpact: "Simulation mode confirmed a reproducible injection signal",
+                attackDomain: "injection",
+                title: "SQL injection sink exposed",
+                proofOfImpact: "Confirmed read-only injection path",
                 proofType: "safe"
               }
+            ],
+            logs: [
+              "[2026-02-14 15:55:40] [workflow] Workflow created",
+              "[2026-02-14 19:46:37] [workflow] Workflow completed"
             ]
-          },
-          deviceLogin: {
-            verificationUri: "https://auth.example.test/device",
-            userCode: "ABCD-EFGH",
-            sessionId: "device-session-1"
           }
         }}
       />
     );
 
-    expect(markup).toContain("DemumuMind Ultra Testings");
-    expect(markup).toContain("Desktop Shell");
-    expect(markup).toContain("Windows ready");
-    expect(markup).toContain("Connected");
-    expect(markup).toContain("Demo app");
-    expect(markup).toContain("GraphQL introspection exposed to anonymous users");
-    expect(markup).toContain("ABCD-EFGH");
-    expect(markup).toContain("report-synthesis");
-    expect(markup).toContain("runner-1");
-    expect(markup).toContain("Project Policy");
-    expect(markup).toContain("Runner Management");
-    expect(markup).toContain("GraphQL Safe Pack");
-    expect(markup).toContain("graphql-introspection");
-    expect(markup).toContain("http://127.0.0.1:4000/api");
+    expect(markup).toContain("Workflow Dashboard");
+    expect(markup).toContain("demo-workspace");
+    expect(markup).toContain("workflow-1");
+    expect(markup).toContain("$57.4691");
+    expect(markup).toContain("2093");
+    expect(markup).toContain("SQL injection sink exposed");
+    expect(markup).toContain("Workflow completed");
+    expect(markup).toContain("OpenAI");
+    expect(markup).toContain("NVIDIA");
+    expect(markup).not.toContain("Project Policy");
+    expect(markup).not.toContain("Runner Management");
+    expect(markup).not.toContain("Capability Packs");
   });
 });
