@@ -15,7 +15,9 @@
     },
     {
       "path": "./apps/web"
+    },
+    {
+      "path": "./apps/desktop"
     }
   ]
 }
-

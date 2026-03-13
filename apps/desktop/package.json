@@ -1,0 +1,39 @@
+{
+  "name": "@shannon/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Windows desktop shell for DemumuMind Ultra Testings",
+  "author": "DemumuMind",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx src/index.ts",
+    "package": "electron-builder --win portable nsis",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "devDependencies": {
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.demumumind.desktop",
+    "productName": "DemumuMind Ultra Testings",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "../server/dist/**/*",
+      "../web/dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    }
+  }
+}
