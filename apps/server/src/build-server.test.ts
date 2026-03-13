@@ -388,4 +388,209 @@ describe("buildServer", () => {
       });
     }
   });
+
+  test("exposes auth status and supports reading and updating project policy", async () => {
+    const workspaceDirectory = await mkdtemp(join(tmpdir(), "demumumind-policy-project-"));
+
+    try {
+      const stateRepository = new InMemoryStateRepository();
+      const authBroker = new OpenAIAuthBroker({
+        provider: new FakeOAuthProviderClient(),
+        stateRepository,
+        vault: new SecretVault({
+          encryptionKey: "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        })
+      });
+      const server = buildServer({
+        stateRepository,
+        authBroker,
+        scanOrchestrator: new ScanOrchestrator({
+          stateRepository,
+          reconService: new CodebaseReconService(),
+          analyzers: [],
+          exploiters: []
+        })
+      });
+
+      try {
+        const started = await server.inject({
+          method: "POST",
+          url: "/api/auth/device/start",
+          payload: {
+            userId: "policy-user"
+          }
+        });
+
+        const polled = await server.inject({
+          method: "POST",
+          url: "/api/auth/device/poll",
+          payload: {
+            userId: "policy-user",
+            sessionId: started.json().sessionId
+          }
+        });
+
+        expect(polled.statusCode).toBe(200);
+
+        const projectResponse = await server.inject({
+          method: "POST",
+          url: "/api/projects/init",
+          payload: {
+            projectRoot: workspaceDirectory,
+            name: "Policy Project",
+            baseUrl: "http://localhost:3001",
+            sourceRoots: [join(workspaceDirectory, "src")]
+          }
+        });
+        const projectId = projectResponse.json().project.id as string;
+
+        const authStatus = await server.inject({
+          method: "GET",
+          url: "/api/auth/status/policy-user"
+        });
+        expect(authStatus.statusCode).toBe(200);
+        expect(authStatus.json().connected).toBe(true);
+
+        const policyResponse = await server.inject({
+          method: "GET",
+          url: `/api/projects/${projectId}/policy`
+        });
+        expect(policyResponse.statusCode).toBe(200);
+        expect(policyResponse.json().destructiveChecksEnabled).toBe(false);
+
+        const updatedPolicy = await server.inject({
+          method: "PATCH",
+          url: `/api/projects/${projectId}/policy`,
+          payload: {
+            activeValidationAllowed: true,
+            destructiveChecksEnabled: true,
+            allowedExploitClasses: ["auth-safe", "graphql-introspection", "destructive-lab"]
+          }
+        });
+        expect(updatedPolicy.statusCode).toBe(200);
+        expect(updatedPolicy.json().destructiveChecksEnabled).toBe(true);
+        expect(updatedPolicy.json().allowedExploitClasses).toContain("destructive-lab");
+      } finally {
+        await server.close();
+      }
+    } finally {
+      await rm(workspaceDirectory, {
+        recursive: true,
+        force: true
+      });
+    }
+  });
+
+  test("supports auth logout and richer runner lifecycle management", async () => {
+    const stateRepository = new InMemoryStateRepository();
+    const authBroker = new OpenAIAuthBroker({
+      provider: new FakeOAuthProviderClient(),
+      stateRepository,
+      vault: new SecretVault({
+        encryptionKey: "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+      })
+    });
+    const server = buildServer({
+      stateRepository,
+      authBroker,
+      scanOrchestrator: new ScanOrchestrator({
+        stateRepository,
+        reconService: new CodebaseReconService(),
+        analyzers: [],
+        exploiters: []
+      })
+    });
+
+    try {
+      const started = await server.inject({
+        method: "POST",
+        url: "/api/auth/device/start",
+        payload: {
+          userId: "runner-user"
+        }
+      });
+
+      const polled = await server.inject({
+        method: "POST",
+        url: "/api/auth/device/poll",
+        payload: {
+          userId: "runner-user",
+          sessionId: started.json().sessionId
+        }
+      });
+
+      expect(polled.statusCode).toBe(200);
+
+      const attachedRunner = await server.inject({
+        method: "POST",
+        url: "/api/runners/attach",
+        payload: {
+          name: "Lab Runner",
+          endpoint: "http://127.0.0.1:4310/api"
+        }
+      });
+
+      expect(attachedRunner.statusCode).toBe(201);
+      expect(attachedRunner.json().name).toBe("Lab Runner");
+      expect(attachedRunner.json().endpoint).toBe("http://127.0.0.1:4310/api");
+      expect(attachedRunner.json().managed).toBe(false);
+      expect(attachedRunner.json().lastSeenAt).toMatch(/^2026|20/);
+
+      const updatedRunner = await server.inject({
+        method: "PATCH",
+        url: `/api/runners/${attachedRunner.json().id}`,
+        payload: {
+          status: "busy"
+        }
+      });
+
+      expect(updatedRunner.statusCode).toBe(200);
+      expect(updatedRunner.json().status).toBe("busy");
+
+      const listedRunners = await server.inject({
+        method: "GET",
+        url: "/api/runners"
+      });
+
+      expect(listedRunners.statusCode).toBe(200);
+      expect(listedRunners.json().some((runner: { name: string }) => runner.name === "Lab Runner")).toBe(true);
+      expect(listedRunners.json()[0].managed).toBe(true);
+
+      const logoutResponse = await server.inject({
+        method: "POST",
+        url: "/api/auth/logout",
+        payload: {
+          userId: "runner-user"
+        }
+      });
+
+      expect(logoutResponse.statusCode).toBe(204);
+
+      const authStatus = await server.inject({
+        method: "GET",
+        url: "/api/auth/status/runner-user"
+      });
+
+      expect(authStatus.statusCode).toBe(200);
+      expect(authStatus.json().connected).toBe(false);
+
+      const detachedRunner = await server.inject({
+        method: "DELETE",
+        url: `/api/runners/${attachedRunner.json().id}`
+      });
+
+      expect(detachedRunner.statusCode).toBe(204);
+
+      const runnersAfterDetach = await server.inject({
+        method: "GET",
+        url: "/api/runners"
+      });
+
+      expect(
+        runnersAfterDetach.json().some((runner: { name: string }) => runner.name === "Lab Runner")
+      ).toBe(false);
+    } finally {
+      await server.close();
+    }
+  });
 });

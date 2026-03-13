@@ -35,6 +35,60 @@ const CAPABILITIES: CapabilityManifest[] = [
     attackDomains: ["authentication", "authorization", "injection", "ssrf", "xss", "graphql"]
   },
   {
+    id: "recon-surface-mapping",
+    name: "Recon surface mapping",
+    description: "Maps routes, handlers, GraphQL operations, and externally reachable surfaces.",
+    category: "core",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: ["authentication", "authorization", "graphql", "business-logic"]
+  },
+  {
+    id: "auth-flow-automation",
+    name: "Auth flow automation",
+    description: "Automates owned login, session bootstrap, and token acquisition flows for testing.",
+    category: "core",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: ["authentication", "authorization", "business-logic"]
+  },
+  {
+    id: "sast-lite",
+    name: "SAST lite",
+    description: "Applies lightweight static heuristics to security-relevant source patterns.",
+    category: "security",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: ["authentication", "authorization", "injection", "ssrf", "xss", "graphql"]
+  },
+  {
+    id: "secret-discovery",
+    name: "Secret discovery",
+    description: "Finds committed credentials, tokens, and sensitive configuration leaks.",
+    category: "security",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: []
+  },
+  {
+    id: "dependency-inventory",
+    name: "Dependency inventory",
+    description: "Builds a dependency inventory and highlights risky package surfaces for review.",
+    category: "security",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: ["injection", "ssrf", "xss", "graphql"]
+  },
+  {
+    id: "business-logic-heuristics",
+    name: "Business logic heuristics",
+    description: "Flags workflow abuse paths and state transitions that deserve active validation.",
+    category: "security",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: ["authentication", "authorization", "business-logic", "graphql"]
+  },
+  {
     id: "safe-exploit-validation",
     name: "Safe exploit validation",
     description: "Runs non-destructive proof checks against owned targets.",
@@ -69,6 +123,33 @@ const CAPABILITIES: CapabilityManifest[] = [
     permissionLevel: "safe",
     enabledByDefault: true,
     attackDomains: ["authentication", "authorization", "xss", "graphql"]
+  },
+  {
+    id: "http-api-testing",
+    name: "HTTP and API testing",
+    description: "Executes managed REST and GraphQL requests against approved targets.",
+    category: "tool-adapter",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: ["authentication", "authorization", "injection", "ssrf", "graphql"]
+  },
+  {
+    id: "static-analyzer-adapter",
+    name: "Static analyzer adapter",
+    description: "Bridges external static analyzers into the correlated finding pipeline.",
+    category: "tool-adapter",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: ["injection", "ssrf", "xss", "graphql"]
+  },
+  {
+    id: "native-scanner-adapter",
+    name: "Native scanner adapter",
+    description: "Wraps native Windows scanner tools as managed capability packs.",
+    category: "tool-adapter",
+    permissionLevel: "safe",
+    enabledByDefault: true,
+    attackDomains: ["authentication", "authorization", "injection", "ssrf", "xss", "graphql"]
   }
 ];
 

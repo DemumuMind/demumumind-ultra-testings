@@ -17,6 +17,7 @@ import type {
   AttackHypothesis,
   ExploitAttempt,
   ProjectConfig,
+  ProjectPolicy,
   ScanRun,
   TargetApplication
 } from "@shannon/shared";
@@ -153,7 +154,52 @@ export function buildServer(options: BuildServerOptions) {
       isRecord(request.body) && typeof request.body.name === "string" && request.body.name.trim()
         ? request.body.name
         : undefined;
-    return reply.status(201).send(runners.attach(name));
+    const endpoint =
+      isRecord(request.body) && typeof request.body.endpoint === "string" && request.body.endpoint.trim()
+        ? request.body.endpoint
+        : undefined;
+    return reply.status(201).send(
+      runners.attach({
+        name,
+        endpoint
+      })
+    );
+  });
+
+  server.patch("/api/runners/:runnerId", async (request, reply) => {
+    const { runnerId } = request.params as { runnerId: string };
+    const status =
+      isRecord(request.body) &&
+      (request.body.status === "ready" ||
+        request.body.status === "busy" ||
+        request.body.status === "offline")
+        ? request.body.status
+        : undefined;
+    const updated = runners.update({
+      id: runnerId,
+      status
+    });
+
+    if (!updated) {
+      return reply.status(404).send({
+        error: "Runner not found"
+      });
+    }
+
+    return reply.send(updated);
+  });
+
+  server.delete("/api/runners/:runnerId", async (request, reply) => {
+    const { runnerId } = request.params as { runnerId: string };
+    const detached = runners.detach(runnerId);
+
+    if (!detached) {
+      return reply.status(404).send({
+        error: "Runner not found"
+      });
+    }
+
+    return reply.status(204).send();
   });
 
   server.post("/api/auth/browser/start", async (request, reply) => {
@@ -248,6 +294,16 @@ export function buildServer(options: BuildServerOptions) {
     return reply.send(connection);
   });
 
+  server.get("/api/auth/status/:userId", async (request) => {
+    const { userId } = request.params as { userId: string };
+    const connection = await options.authBroker.getConnectionForUser(userId);
+
+    return {
+      connected: Boolean(connection),
+      profile: connection?.profile ?? null
+    };
+  });
+
   server.get("/api/targets", async () => {
     return options.stateRepository.list<TargetApplication>("targets");
   });
@@ -284,6 +340,62 @@ export function buildServer(options: BuildServerOptions) {
 
       await options.stateRepository.put("projects", result.project);
       return reply.status(201).send(result);
+    } catch (error) {
+      return reply.status(400).send({
+        error: (error as Error).message
+      });
+    }
+  });
+
+  server.get("/api/projects/:projectId/policy", async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const project = await options.stateRepository.get<ProjectConfig>("projects", projectId);
+
+    if (!project) {
+      return reply.status(404).send({
+        error: "Project not found"
+      });
+    }
+
+    return reply.send(project.policy);
+  });
+
+  server.patch("/api/projects/:projectId/policy", async (request, reply) => {
+    try {
+      const { projectId } = request.params as { projectId: string };
+      const project = await options.stateRepository.get<ProjectConfig>("projects", projectId);
+
+      if (!project) {
+        return reply.status(404).send({
+          error: "Project not found"
+        });
+      }
+
+      const currentPolicy = project.policy;
+      const policy: ProjectPolicy = {
+        activeValidationAllowed:
+          isRecord(request.body) && typeof request.body.activeValidationAllowed === "boolean"
+            ? request.body.activeValidationAllowed
+            : currentPolicy.activeValidationAllowed,
+        destructiveChecksEnabled:
+          isRecord(request.body) && typeof request.body.destructiveChecksEnabled === "boolean"
+            ? request.body.destructiveChecksEnabled
+            : currentPolicy.destructiveChecksEnabled,
+        allowedExploitClasses:
+          isRecord(request.body) && Array.isArray(request.body.allowedExploitClasses)
+            ? request.body.allowedExploitClasses.filter(
+                (value): value is string => typeof value === "string" && value.trim().length > 0
+              )
+            : currentPolicy.allowedExploitClasses
+      };
+
+      const result = await projectBootstrapService.updateProjectPolicy({
+        project,
+        policy
+      });
+
+      await options.stateRepository.put("projects", result.project);
+      return reply.send(result.project.policy);
     } catch (error) {
       return reply.status(400).send({
         error: (error as Error).message

@@ -5,6 +5,7 @@ export * from "./models/model-gateway.js";
 export * from "./models/model-runtime.js";
 export * from "./recon/codebase-recon-service.js";
 export * from "./runtime/index.js";
+export * from "./scans/safe-exploit-pack-registry.js";
 export * from "./scans/scan-orchestrator.js";
 export * from "./security/secret-vault.js";
 export * from "./storage/file-state-repository.js";

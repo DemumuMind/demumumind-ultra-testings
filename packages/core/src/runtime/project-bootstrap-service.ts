@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
-import type { ProjectConfig, ProviderKind } from "@shannon/shared";
+import type { ProjectConfig, ProjectPolicy, ProviderKind } from "@shannon/shared";
 
 interface InitializeProjectInput {
   projectRoot: string;
@@ -15,6 +15,11 @@ interface InitializeProjectResult {
   project: ProjectConfig;
   configPath: string;
   policyPath: string;
+}
+
+interface UpdateProjectPolicyInput {
+  project: ProjectConfig;
+  policy: ProjectPolicy;
 }
 
 function renderYamlLines(project: ProjectConfig): string[] {
@@ -91,6 +96,36 @@ export class ProjectBootstrapService {
     const configPath = join(input.projectRoot, "demumumind.config.yaml");
     const policyPath = join(policiesDirectory, "default.yaml");
 
+    await this.writeProjectFiles(project);
+
+    return {
+      project,
+      configPath,
+      policyPath
+    };
+  }
+
+  async updateProjectPolicy(input: UpdateProjectPolicyInput): Promise<InitializeProjectResult> {
+    const updatedProject: ProjectConfig = {
+      ...input.project,
+      policy: input.policy,
+      updatedAt: new Date().toISOString()
+    };
+
+    await this.writeProjectFiles(updatedProject);
+
+    return {
+      project: updatedProject,
+      configPath: join(updatedProject.projectRoot, "demumumind.config.yaml"),
+      policyPath: join(updatedProject.projectRoot, "policies", "default.yaml")
+    };
+  }
+
+  private async writeProjectFiles(project: ProjectConfig): Promise<void> {
+    const policiesDirectory = join(project.projectRoot, "policies");
+    const configPath = join(project.projectRoot, "demumumind.config.yaml");
+    const policyPath = join(policiesDirectory, "default.yaml");
+
     await mkdir(policiesDirectory, {
       recursive: true
     });
@@ -104,11 +139,5 @@ export class ProjectBootstrapService {
 
     await writeFile(configPath, `${renderYamlLines(project).join("\n")}\n`, "utf8");
     await writeFile(policyPath, `${renderPolicyLines(project).join("\n")}\n`, "utf8");
-
-    return {
-      project,
-      configPath,
-      policyPath
-    };
   }
 }

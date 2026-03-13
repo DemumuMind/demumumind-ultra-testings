@@ -61,6 +61,15 @@ describe("DemumuMind shared contracts", () => {
       scanRunId: "scan-1",
       findingIds: [finding.id],
       generatedAt: "2026-03-13T11:00:00.000Z",
+      exploitPacks: [
+        {
+          id: "graphql-safe-pack",
+          title: "GraphQL Safe Pack",
+          attackDomain: "graphql",
+          proofType: "safe",
+          permissionLevel: "safe"
+        }
+      ],
       coverageMatrix: [
         {
           id: "graphql-abuse",
@@ -79,6 +88,7 @@ describe("DemumuMind shared contracts", () => {
     });
 
     expect(finding.proofType).toBe("safe");
+    expect(report.exploitPacks[0]?.id).toBe("graphql-safe-pack");
     expect(report.coverageMatrix).toHaveLength(2);
     expect(report.unsupportedClasses).toContain("mobile-thick-client");
   });

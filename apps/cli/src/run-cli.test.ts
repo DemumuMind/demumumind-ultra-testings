@@ -92,6 +92,33 @@ function createFakeApiClient() {
         }
       };
     },
+    async getAuthStatus(userId) {
+      calls.push(`getAuthStatus:${userId}`);
+      return {
+        connected: true,
+        profile: {
+          email: "device@example.com",
+          name: "Device User"
+        }
+      };
+    },
+    async getPolicy(projectId) {
+      calls.push(`getPolicy:${projectId}`);
+      return {
+        activeValidationAllowed: true,
+        destructiveChecksEnabled: false,
+        allowedExploitClasses: ["auth-safe", "graphql-introspection"]
+      };
+    },
+    async updatePolicy(projectId, input) {
+      calls.push(`updatePolicy:${projectId}`);
+      return {
+        activeValidationAllowed: input.activeValidationAllowed ?? true,
+        destructiveChecksEnabled: input.destructiveChecksEnabled ?? false,
+        allowedExploitClasses:
+          input.allowedExploitClasses ?? ["auth-safe", "graphql-introspection"]
+      };
+    },
     async createTarget(input) {
       calls.push(`createTarget:${input.name}`);
       return {
@@ -427,6 +454,70 @@ describe("runCli", () => {
       expect(output.join("\n")).toContain("demumumind.config.yaml");
       expect(output.join("\n")).toContain("report-synthesis");
       expect(output.join("\n")).toContain("runner-1");
+    } finally {
+      await rm(directory, {
+        recursive: true,
+        force: true
+      });
+    }
+  });
+
+  test("supports auth status and policy show and update commands", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "demumumind-cli-policy-"));
+
+    try {
+      const { apiClient, calls } = createFakeApiClient();
+      const output: string[] = [];
+
+      const authExit = await runCli(["node", "cli", "/auth", "status", "--user", "policy-user"], {
+        apiClient,
+        sessionFilePath: join(directory, "session.json"),
+        writeStdout: (line) => output.push(line),
+        writeStderr: (line) => output.push(line)
+      });
+
+      const policyShowExit = await runCli(
+        ["node", "cli", "/policy", "show", "--project-id", "project-1"],
+        {
+          apiClient,
+          sessionFilePath: join(directory, "session.json"),
+          writeStdout: (line) => output.push(line),
+          writeStderr: (line) => output.push(line)
+        }
+      );
+
+      const policyUpdateExit = await runCli(
+        [
+          "node",
+          "cli",
+          "/policy",
+          "enable-destructive",
+          "--project-id",
+          "project-1",
+          "--allow-class",
+          "destructive-lab"
+        ],
+        {
+          apiClient,
+          sessionFilePath: join(directory, "session.json"),
+          writeStdout: (line) => output.push(line),
+          writeStderr: (line) => output.push(line)
+        }
+      );
+
+      expect(authExit).toBe(0);
+      expect(policyShowExit).toBe(0);
+      expect(policyUpdateExit).toBe(0);
+      expect(calls).toEqual(
+        expect.arrayContaining([
+          "getAuthStatus:policy-user",
+          "getPolicy:project-1",
+          "updatePolicy:project-1"
+        ])
+      );
+      expect(output.join("\n")).toContain("device@example.com");
+      expect(output.join("\n")).toContain("graphql-introspection");
+      expect(output.join("\n")).toContain("destructive-lab");
     } finally {
       await rm(directory, {
         recursive: true,

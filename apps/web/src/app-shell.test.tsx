@@ -8,6 +8,7 @@ describe("AppShell", () => {
         state={{
           operatorId: "local-cli-user",
           connectionEmail: "analyst@example.com",
+          authState: "connected",
           doctorStatus: "ready",
           projects: [
             {
@@ -35,11 +36,29 @@ describe("AppShell", () => {
               permissionLevel: "safe"
             }
           ],
+          exploitPacks: [
+            {
+              id: "graphql-safe-pack",
+              title: "GraphQL Safe Pack",
+              attackDomain: "graphql",
+              proofType: "safe",
+              permissionLevel: "safe"
+            }
+          ],
+          selectedPolicy: {
+            activeValidationAllowed: true,
+            destructiveChecksEnabled: false,
+            allowedExploitClasses: ["auth-safe", "graphql-introspection"]
+          },
           runners: [
             {
               id: "runner-1",
+              name: "Local Runner",
               mode: "local",
-              status: "ready"
+              status: "ready",
+              endpoint: "http://127.0.0.1:4000/api",
+              managed: true,
+              lastSeenAt: "2026-03-13T13:00:00.000Z"
             }
           ],
           scans: [
@@ -96,10 +115,16 @@ describe("AppShell", () => {
     expect(markup).toContain("DemumuMind Ultra Testings");
     expect(markup).toContain("Desktop Shell");
     expect(markup).toContain("Windows ready");
+    expect(markup).toContain("Connected");
     expect(markup).toContain("Demo app");
     expect(markup).toContain("GraphQL introspection exposed to anonymous users");
     expect(markup).toContain("ABCD-EFGH");
     expect(markup).toContain("report-synthesis");
     expect(markup).toContain("runner-1");
+    expect(markup).toContain("Project Policy");
+    expect(markup).toContain("Runner Management");
+    expect(markup).toContain("GraphQL Safe Pack");
+    expect(markup).toContain("graphql-introspection");
+    expect(markup).toContain("http://127.0.0.1:4000/api");
   });
 });

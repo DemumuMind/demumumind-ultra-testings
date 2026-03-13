@@ -70,4 +70,22 @@ describe("DemumuMind runtime services", () => {
       });
     }
   });
+
+  test("exposes deeper capability packs for white-box AppSec workflows", () => {
+    const capabilities = new CapabilityRegistry().list();
+
+    expect(capabilities.map((capability) => capability.id)).toEqual(
+      expect.arrayContaining([
+        "recon-surface-mapping",
+        "auth-flow-automation",
+        "sast-lite",
+        "secret-discovery",
+        "dependency-inventory",
+        "business-logic-heuristics",
+        "http-api-testing",
+        "static-analyzer-adapter",
+        "native-scanner-adapter"
+      ])
+    );
+  });
 });

@@ -28,8 +28,23 @@ interface LatestReportState {
   }>;
 }
 
+interface ProjectPolicyState {
+  activeValidationAllowed: boolean;
+  destructiveChecksEnabled: boolean;
+  allowedExploitClasses: string[];
+}
+
+interface ExploitPackState {
+  id: string;
+  title: string;
+  attackDomain: string;
+  proofType: string;
+  permissionLevel: string;
+}
+
 interface AppShellState {
   operatorId: string;
+  authState: "connected" | "pending" | "disconnected";
   connectionEmail: string | null;
   doctorStatus: string;
   projects: Array<{
@@ -48,10 +63,16 @@ interface AppShellState {
     category: string;
     permissionLevel: string;
   }>;
+  exploitPacks: ExploitPackState[];
+  selectedPolicy: ProjectPolicyState | null;
   runners: Array<{
     id: string;
+    name: string;
     mode: string;
     status: string;
+    endpoint?: string;
+    managed: boolean;
+    lastSeenAt: string;
   }>;
   scans: Array<{
     id: string;
@@ -69,6 +90,13 @@ interface AppShellProps {
 }
 
 export function AppShell({ state, controls }: AppShellProps) {
+  const operatorStatusLabel =
+    state.authState === "connected"
+      ? "Connected"
+      : state.authState === "pending"
+        ? "Pending login"
+        : "Not connected";
+
   return (
     <div className="page-shell">
       <header className="hero">
@@ -85,7 +113,7 @@ export function AppShell({ state, controls }: AppShellProps) {
           <div>
             <p className="label">Operator</p>
             <strong>{state.operatorId}</strong>
-            <p className="muted">{state.connectionEmail ? "Connected" : "Not connected"}</p>
+            <p className="muted">{operatorStatusLabel}</p>
             <p className="muted">
               {state.doctorStatus === "ready" ? "Windows ready" : "Needs environment fixes"}
             </p>
@@ -112,6 +140,34 @@ export function AppShell({ state, controls }: AppShellProps) {
         <section className="panel">
           <div className="panel-header">
             <div>
+              <p className="eyebrow">Authentication</p>
+              <h2>Operator Auth</h2>
+            </div>
+            <span className="pill">{operatorStatusLabel}</span>
+          </div>
+          <div className="timeline">
+            <article className="timeline-item">
+              <div className="card-topline">
+                <strong>Current operator</strong>
+                <span className="pill">{state.authState}</span>
+              </div>
+              <p>{state.connectionEmail ?? "No linked profile yet"}</p>
+            </article>
+            {state.deviceLogin ? (
+              <div className="device-card">
+                <p className="label">Device login</p>
+                <strong>{state.deviceLogin.userCode}</strong>
+                <a href={state.deviceLogin.verificationUri} target="_blank" rel="noreferrer">
+                  {state.deviceLogin.verificationUri}
+                </a>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
               <p className="eyebrow">Providers</p>
               <h2>LLM Backends</h2>
             </div>
@@ -126,15 +182,6 @@ export function AppShell({ state, controls }: AppShellProps) {
                 </div>
               </article>
             ))}
-            {state.deviceLogin ? (
-              <div className="device-card">
-                <p className="label">Device login</p>
-                <strong>{state.deviceLogin.userCode}</strong>
-                <a href={state.deviceLogin.verificationUri} target="_blank" rel="noreferrer">
-                  {state.deviceLogin.verificationUri}
-                </a>
-              </div>
-            ) : null}
           </div>
         </section>
 
@@ -186,8 +233,35 @@ export function AppShell({ state, controls }: AppShellProps) {
         <section className="panel">
           <div className="panel-header">
             <div>
+              <p className="eyebrow">Policy</p>
+              <h2>Project Policy</h2>
+            </div>
+          </div>
+          <div className="timeline">
+            {state.selectedPolicy ? (
+              <article className="timeline-item">
+                <div className="card-topline">
+                  <strong>Validation mode</strong>
+                  <span className="pill">
+                    {state.selectedPolicy.destructiveChecksEnabled ? "destructive-enabled" : "safe"}
+                  </span>
+                </div>
+                <p className="muted">
+                  active validation: {state.selectedPolicy.activeValidationAllowed ? "enabled" : "disabled"}
+                </p>
+                <p>{state.selectedPolicy.allowedExploitClasses.join(", ")}</p>
+              </article>
+            ) : (
+              <p className="muted">Select a project to inspect and edit its policy.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
               <p className="eyebrow">Runners</p>
-              <h2>Local and Attached</h2>
+              <h2>Runner Management</h2>
             </div>
           </div>
           <div className="timeline">
@@ -197,7 +271,32 @@ export function AppShell({ state, controls }: AppShellProps) {
                   <strong>{runner.id}</strong>
                   <span className="pill">{runner.status}</span>
                 </div>
-                <p className="muted">{runner.mode}</p>
+                <p>{runner.name}</p>
+                <p className="muted">{runner.endpoint ?? "no endpoint"}</p>
+                <p className="muted">
+                  {runner.mode} · {runner.managed ? "managed" : "attached"} · last seen {runner.lastSeenAt}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Exploit packs</p>
+              <h2>Safe Exploit Packs</h2>
+            </div>
+          </div>
+          <div className="timeline">
+            {state.exploitPacks.map((pack) => (
+              <article key={pack.id} className="timeline-item">
+                <div className="card-topline">
+                  <strong>{pack.title}</strong>
+                  <span className="pill">{pack.proofType}</span>
+                </div>
+                <p>{pack.attackDomain}</p>
+                <p className="muted">{pack.permissionLevel}</p>
               </article>
             ))}
           </div>

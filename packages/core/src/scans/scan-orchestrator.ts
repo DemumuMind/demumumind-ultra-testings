@@ -4,6 +4,7 @@ import type {
   AttackHypothesis,
   ConfirmedFinding,
   CoverageMatrixItem,
+  ExploitPackSummary,
   ExploitAttempt,
   ReconArtifact,
   Report,
@@ -11,6 +12,7 @@ import type {
   ScanRun
 } from "@shannon/shared";
 import type { StateRepository } from "../storage/state-repository.js";
+import { SafeExploitPackRegistry } from "./safe-exploit-pack-registry.js";
 
 interface ReconService {
   runRecon(input: {
@@ -41,9 +43,11 @@ interface ScanOrchestratorOptions {
 
 export class ScanOrchestrator {
   private readonly now: () => string;
+  private readonly exploitPacks: SafeExploitPackRegistry;
 
   constructor(private readonly options: ScanOrchestratorOptions) {
     this.now = options.now ?? (() => new Date().toISOString());
+    this.exploitPacks = new SafeExploitPackRegistry();
   }
 
   async enqueueScan(input: {
@@ -163,7 +167,7 @@ export class ScanOrchestrator {
         reproductionStatus: "confirmed",
         lifecycleStage: "confirmed",
         confidence: this.confidenceForDomain(matchingAttempt.domain),
-        proofType: "safe",
+        proofType: this.proofTypeForDomain(matchingAttempt.domain),
         remediation: this.remediationForDomain(matchingAttempt.domain),
         unsupportedNotes: []
       };
@@ -181,6 +185,7 @@ export class ScanOrchestrator {
       scanRunId: persistedRun.id,
       findingIds: findings.map((finding) => finding.id),
       generatedAt: this.now(),
+      exploitPacks: this.buildExploitPackSummaries(),
       coverageMatrix: this.buildCoverageMatrix(),
       unsupportedClasses: ["mobile-thick-client", "native-binary", "network-perimeter"]
     };
@@ -266,50 +271,15 @@ export class ScanOrchestrator {
     }
   }
 
+  private proofTypeForDomain(domain: AttackDomain): ConfirmedFinding["proofType"] {
+    return this.exploitPacks.forDomain(domain)?.proofType ?? "safe";
+  }
+
   private buildCoverageMatrix(): CoverageMatrixItem[] {
-    return [
-      {
-        id: "authentication",
-        title: "Authentication flaws",
-        status: "supported",
-        proofType: "safe"
-      },
-      {
-        id: "authorization",
-        title: "Authorization flaws",
-        status: "supported",
-        proofType: "safe"
-      },
-      {
-        id: "injection",
-        title: "Injection families",
-        status: "supported",
-        proofType: "safe"
-      },
-      {
-        id: "ssrf",
-        title: "SSRF",
-        status: "supported",
-        proofType: "safe"
-      },
-      {
-        id: "xss",
-        title: "Cross-site scripting",
-        status: "supported",
-        proofType: "safe"
-      },
-      {
-        id: "graphql-abuse",
-        title: "GraphQL abuse paths",
-        status: "supported",
-        proofType: "safe"
-      },
-      {
-        id: "business-logic",
-        title: "Business logic invariants",
-        status: "partial",
-        proofType: "safe"
-      }
-    ];
+    return this.exploitPacks.buildCoverageMatrix();
+  }
+
+  private buildExploitPackSummaries(): ExploitPackSummary[] {
+    return this.exploitPacks.list();
   }
 }

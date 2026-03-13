@@ -225,9 +225,36 @@ select {
 .target-card,
 .timeline-item,
 .finding-card,
-.device-card {
+.device-card,
+.section-card {
   padding: 1rem;
   background: var(--bg-card);
+}
+
+.section-card {
+  border: 1px solid var(--border);
+  border-radius: 1.2rem;
+}
+
+.toggle-field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text);
+  background: rgba(5, 18, 23, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.toggle-field input {
+  width: auto;
+}
+
+.runner-label {
+  min-width: 12rem;
+  font-weight: 600;
+  color: var(--text);
 }
 
 @media (max-width: 960px) {

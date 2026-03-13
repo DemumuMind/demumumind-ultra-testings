@@ -154,6 +154,14 @@ export const coverageMatrixItemSchema = z.object({
   proofType: proofModeSchema
 });
 
+export const exploitPackSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  attackDomain: attackDomainSchema,
+  proofType: proofModeSchema,
+  permissionLevel: capabilityPermissionSchema
+});
+
 export const runnerModeSchema = z.enum(["local", "attached"]);
 export const runnerStatusSchema = z.enum(["ready", "busy", "offline"]);
 
@@ -162,7 +170,9 @@ export const runnerSchema = z.object({
   name: z.string(),
   mode: runnerModeSchema,
   status: runnerStatusSchema,
-  endpoint: z.string().optional()
+  endpoint: z.string().optional(),
+  managed: z.boolean().default(false),
+  lastSeenAt: z.string().datetime()
 });
 
 export const riskIndicatorSchema = z.object({
@@ -240,6 +250,7 @@ export const reportSchema = z.object({
   scanRunId: z.string(),
   findingIds: z.array(z.string()),
   generatedAt: z.string().datetime(),
+  exploitPacks: z.array(exploitPackSummarySchema).default([]),
   coverageMatrix: z.array(coverageMatrixItemSchema).default([]),
   unsupportedClasses: z.array(z.string()).default([])
 });
@@ -288,6 +299,7 @@ export type ProjectConfig = z.infer<typeof projectConfigSchema>;
 export type DoctorCheck = z.infer<typeof doctorCheckSchema>;
 export type DoctorReport = z.infer<typeof doctorReportSchema>;
 export type CoverageMatrixItem = z.infer<typeof coverageMatrixItemSchema>;
+export type ExploitPackSummary = z.infer<typeof exploitPackSummarySchema>;
 export type Runner = z.infer<typeof runnerSchema>;
 export type RiskIndicator = z.infer<typeof riskIndicatorSchema>;
 export type PhaseTransition = z.infer<typeof phaseTransitionSchema>;

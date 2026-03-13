@@ -223,6 +223,23 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
     writeStdout(`${connection.profile.name} <${connection.profile.email}>`);
   });
 
+  const auth = program.command("auth");
+
+  auth
+    .command("status")
+    .option("--user <userId>", "Local user identifier")
+    .action(async (options: { user?: string }) => {
+      const userId = options.user ?? (await requireSessionUserId(sessionFilePath));
+      const status = await apiClient.getAuthStatus(userId);
+
+      if (!status.connected || !status.profile) {
+        writeStdout(`No active connection for ${userId}`);
+        return;
+      }
+
+      writeStdout(`${status.profile.name} <${status.profile.email}>`);
+    });
+
   program.command("doctor").action(async () => {
     const report = await apiClient.getDoctorReport();
 
@@ -288,6 +305,38 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
   project.command("list").action(async () => {
     printJson(writeStdout, await apiClient.getProjects());
   });
+
+  const policy = program.command("policy");
+
+  policy
+    .command("show")
+    .requiredOption("--project-id <projectId>", "Project identifier")
+    .action(async (options: { projectId: string }) => {
+      printJson(writeStdout, await apiClient.getPolicy(options.projectId));
+    });
+
+  policy
+    .command("enable-destructive")
+    .requiredOption("--project-id <projectId>", "Project identifier")
+    .option(
+      "--allow-class <attackClass>",
+      "Allow an exploit class in the project policy",
+      (value: string, previous: string[]) => [...previous, value],
+      [] as string[]
+    )
+    .action(async (options: { projectId: string; allowClass: string[] }) => {
+      const existingPolicy = await apiClient.getPolicy(options.projectId);
+      const allowedExploitClasses = Array.from(
+        new Set([...existingPolicy.allowedExploitClasses, ...options.allowClass])
+      );
+      const updated = await apiClient.updatePolicy(options.projectId, {
+        activeValidationAllowed: true,
+        destructiveChecksEnabled: true,
+        allowedExploitClasses
+      });
+
+      printJson(writeStdout, updated);
+    });
 
   const runner = program.command("runner");
 

@@ -46,6 +46,13 @@ export interface ShannonApiClient {
       name: string;
     };
   } | null>;
+  getAuthStatus(userId: string): Promise<{
+    connected: boolean;
+    profile: {
+      email: string;
+      name: string;
+    } | null;
+  }>;
   createTarget(input: {
     name: string;
     baseUrl: string;
@@ -124,6 +131,23 @@ export interface ShannonApiClient {
       baseUrl?: string;
     }>
   >;
+  getPolicy(projectId: string): Promise<{
+    activeValidationAllowed: boolean;
+    destructiveChecksEnabled: boolean;
+    allowedExploitClasses: string[];
+  }>;
+  updatePolicy(
+    projectId: string,
+    input: {
+      activeValidationAllowed?: boolean;
+      destructiveChecksEnabled?: boolean;
+      allowedExploitClasses?: string[];
+    }
+  ): Promise<{
+    activeValidationAllowed: boolean;
+    destructiveChecksEnabled: boolean;
+    allowedExploitClasses: string[];
+  }>;
   attachRunner(input?: { name?: string }): Promise<{
     id: string;
     mode: string;
@@ -202,6 +226,16 @@ export class FetchShannonApiClient implements ShannonApiClient {
         name: string;
       };
     }>(response);
+  }
+
+  async getAuthStatus(userId: string) {
+    return this.get<{
+      connected: boolean;
+      profile: {
+        email: string;
+        name: string;
+      } | null;
+    }>(`/api/auth/status/${userId}`);
   }
 
   async createTarget(input: {
@@ -313,6 +347,29 @@ export class FetchShannonApiClient implements ShannonApiClient {
     >("/api/projects");
   }
 
+  async getPolicy(projectId: string) {
+    return this.get<{
+      activeValidationAllowed: boolean;
+      destructiveChecksEnabled: boolean;
+      allowedExploitClasses: string[];
+    }>(`/api/projects/${projectId}/policy`);
+  }
+
+  async updatePolicy(
+    projectId: string,
+    input: {
+      activeValidationAllowed?: boolean;
+      destructiveChecksEnabled?: boolean;
+      allowedExploitClasses?: string[];
+    }
+  ) {
+    return this.patch<{
+      activeValidationAllowed: boolean;
+      destructiveChecksEnabled: boolean;
+      allowedExploitClasses: string[];
+    }>(`/api/projects/${projectId}/policy`, input);
+  }
+
   async attachRunner(input?: { name?: string }) {
     return this.post<{
       id: string;
@@ -329,8 +386,16 @@ export class FetchShannonApiClient implements ShannonApiClient {
   }
 
   private async post<T>(path: string, payload: unknown): Promise<T> {
+    return this.sendJson("POST", path, payload);
+  }
+
+  private async patch<T>(path: string, payload: unknown): Promise<T> {
+    return this.sendJson("PATCH", path, payload);
+  }
+
+  private async sendJson<T>(method: "POST" | "PATCH", path: string, payload: unknown): Promise<T> {
     const response = await fetch(new URL(path, this.baseUrl), {
-      method: "POST",
+      method,
       headers: {
         "content-type": "application/json"
       },

@@ -104,6 +104,19 @@ describe("ScanOrchestrator", () => {
 
     const persistedRun = (await stateRepository.list<ScanRun>("scanRuns"))[0];
     const findings = await stateRepository.list<ConfirmedFinding>("confirmedFindings");
+    const reports = await stateRepository.list<{
+      id: string;
+      exploitPacks?: Array<{
+        id: string;
+        attackDomain: string;
+        proofType: string;
+      }>;
+      coverageMatrix: Array<{
+        id: string;
+        proofType: string;
+      }>;
+    }>("reports");
+    const report = reports[0];
 
     expect(run.status).toBe("queued");
     expect(persistedRun?.status).toBe("completed");
@@ -122,5 +135,36 @@ describe("ScanOrchestrator", () => {
     expect(findings[0]?.attackDomain).toBe("injection");
     expect(findings[0]?.proofOfConcept).toContain("/api/login");
     expect(findings[0]?.proofType).toBe("safe");
+    expect(report?.exploitPacks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "auth-safe-pack",
+          attackDomain: "authentication",
+          proofType: "safe"
+        }),
+        expect.objectContaining({
+          id: "authorization-safe-pack",
+          attackDomain: "authorization",
+          proofType: "safe"
+        }),
+        expect.objectContaining({
+          id: "graphql-safe-pack",
+          attackDomain: "graphql",
+          proofType: "safe"
+        })
+      ])
+    );
+    expect(report?.coverageMatrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "graphql-abuse",
+          proofType: "safe"
+        }),
+        expect.objectContaining({
+          id: "business-logic",
+          proofType: "safe"
+        })
+      ])
+    );
   });
 });
