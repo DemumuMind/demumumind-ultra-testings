@@ -25,7 +25,12 @@
     "files": [
       "dist/**/*",
       "../server/dist/**/*",
+      "../worker/dist/**/*",
       "../web/dist/**/*",
+      "../../configs/**/*",
+      "../../prompts/**/*",
+      "../../docker-compose.yml",
+      "../../Dockerfile",
       "package.json"
     ],
     "win": {

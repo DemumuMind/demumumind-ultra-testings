@@ -5,7 +5,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@shannon/core": fileURLToPath(new URL("./packages/core/src/index.ts", import.meta.url)),
-      "@shannon/shared": fileURLToPath(new URL("./packages/shared/src/index.ts", import.meta.url))
+      "@shannon/shared": fileURLToPath(new URL("./packages/shared/src/index.ts", import.meta.url)),
+      "@shannon/worker": fileURLToPath(new URL("./apps/worker/src/index.ts", import.meta.url))
     }
   },
   test: {

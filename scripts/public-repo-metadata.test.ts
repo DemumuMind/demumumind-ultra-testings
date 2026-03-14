@@ -19,8 +19,12 @@ describe("public repository metadata", () => {
     expect(readme).toContain("corepack enable");
     expect(readme).toContain("pnpm install");
     expect(readme).toContain("pnpm build");
-    expect(readme).toContain("automatically boots the daemon");
+    expect(readme).toContain("automatically boots the local Temporal runtime");
     expect(readme).toContain("DEMUMUMIND_SERVER_BOOTSTRAP_COMMAND");
+    expect(readme).toContain("./demumu login --provider openai");
+    expect(readme).toContain("./demumu config");
+    expect(readme).toContain("CCS Codex");
+    expect(readme).toContain('netsh advfirewall firewall add rule name="CCS OAuth"');
     expect(readme).toContain("./demumu start URL=https://example.com REPO=repo-name");
     expect(readme).toContain("./demumu logs ID=<workflow-id>");
     expect(readme).toContain("./demumu query ID=<workflow-id>");

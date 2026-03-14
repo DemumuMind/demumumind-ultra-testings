@@ -11,7 +11,7 @@ The first implementation wave keeps the runtime in TypeScript and constrains pro
 - `OpenAI`
 - `NVIDIA`
 
-Browser/device auth is the preferred connection path. Environment variables remain available as a fallback for headless and CI usage.
+`CCS Codex` is the preferred OpenAI connection path. Manual environment variables remain available as a fallback for headless and CI usage.
 
 ## Quick Start
 
@@ -27,16 +27,16 @@ pnpm build
 
 ### 2. Configure providers
 
-`demumu start` automatically boots the daemon when it is not already running.
+`demumu start` automatically boots the local Temporal runtime when it is not already running.
 
-- For local HTTP URLs, the CLI starts the bundled server directly.
-- If `apps/server/dist/index.js` is missing, the CLI falls back to starting `apps/server/src/index.ts` through `tsx`.
-- For custom or remote `DEMUMUMIND_SERVER_URL` values, set `DEMUMUMIND_SERVER_BOOTSTRAP_COMMAND` to teach the CLI how to start that daemon.
+- By default, the CLI starts the local Docker runtime with `docker compose up temporal worker -d`.
+- For custom or remote `DEMUMUMIND_SERVER_URL` values, set `DEMUMUMIND_SERVER_BOOTSTRAP_COMMAND` to teach the CLI how to start that runtime.
 
 Preferred path:
 
 ```bash
-./demumu login --device-auth --provider openai
+./demumu login --provider openai
+./demumu config
 ```
 
 Fallback path for headless and CI:
@@ -46,6 +46,14 @@ export OPENAI_API_KEY="your-api-key"
 export NVIDIA_API_KEY="your-api-key"
 export NVIDIA_BASE_URL="https://integrate.api.nvidia.com/v1"
 ```
+
+Windows note for CCS OAuth:
+
+```powershell
+netsh advfirewall firewall add rule name="CCS OAuth" dir=in action=allow protocol=TCP localport=1455
+```
+
+If browser auth hangs, run the firewall rule above as Administrator and retry. `ccs config` starts the CCS dashboard at `http://localhost:3000` and CLIProxy on `localhost:8317`.
 
 ### 3. Run a workflow
 
@@ -94,10 +102,11 @@ demumu help
 Provider connection helpers:
 
 ```text
-demumu login --device-auth --provider openai
-demumu login --provider nvidia
-demumu logout
+demumu login --provider openai
+demumu config
 demumu whoami
+demumu doctor
+demumu providers
 ```
 
 Compatibility notes:
@@ -120,6 +129,7 @@ The web app is intentionally narrow in scope:
 - phase history
 - log view
 - findings and agent breakdown
+- OpenAI via CCS status, connect, and dashboard controls
 
 It is no longer the primary place for broad control-plane administration in v1.
 
@@ -191,9 +201,8 @@ Only these providers are supported in v1:
 Provider metadata is intentionally fixed in the product surface and dashboard.
 
 Preferred auth order:
-1. Browser OAuth
-2. Device authorization
-3. Manual environment variables
+1. CCS Codex
+2. Manual environment variables
 
 ## Migration from the Old CLI
 

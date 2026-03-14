@@ -1,0 +1,30 @@
+services:
+  temporal:
+    image: temporalio/temporal:latest
+    command: ["server", "start-dev", "--db-filename", "/home/temporal/temporal.db", "--ip", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:7233:7233"
+      - "127.0.0.1:8233:8233"
+    volumes:
+      - temporal-data:/home/temporal
+
+  worker:
+    build: .
+    command: ["node", "apps/worker/dist/index.js", "worker"]
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - SHANNON_DEFAULT_MODEL=${SHANNON_DEFAULT_MODEL:-openai/gpt-4.1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NVIDIA_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+    depends_on:
+      - temporal
+    volumes:
+      - ./configs:/app/configs
+      - ./prompts:/app/prompts
+      - ./audit-logs:/app/audit-logs
+      - ./repos:/app/repos
+      - ./credentials:/app/credentials:ro
+
+volumes:
+  temporal-data:

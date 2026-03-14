@@ -1,0 +1,1 @@
+Produce a markdown reconnaissance summary using repository signals and discovered routes.

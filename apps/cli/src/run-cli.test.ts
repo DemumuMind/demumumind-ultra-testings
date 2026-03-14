@@ -3,16 +3,60 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hostname } from "node:os";
 import { CLI_QUICK_START_HELP, buildRuntimeBootstrapPlan, runCli } from "./run-cli.js";
-import type {
-  BrowserLoginResult,
-  DeviceLoginPollResult,
-  DeviceLoginStartResult,
-  ShannonApiClient
-} from "./api-client.js";
+import type { ShannonApiClient } from "./api-client.js";
+
+function createFakeCcsService() {
+  const calls: string[] = [];
+  let status = {
+    binaryReady: true,
+    settingsPath: "C:/Users/demo/.ccs/codex.settings.json",
+    profileConfigured: true,
+    dashboardUrl: "http://localhost:3000",
+    dashboardRunning: true,
+    cliProxyRunning: true,
+    callbackPort: 1455,
+    callbackPortReady: true,
+    localhostBindable: true,
+    firewallStatus: "warn" as const,
+    recentLogs: ["[OK] Browser opened"],
+    recommendedFixes: [
+      'netsh advfirewall firewall add rule name="CCS OAuth" dir=in action=allow protocol=TCP localport=1455'
+    ],
+    activeProcess: "idle" as const
+  };
+
+  return {
+    calls,
+    ccsService: {
+      async getStatus() {
+        calls.push("getStatus");
+        return status;
+      },
+      async runOpenAiConnectAttached() {
+        calls.push("runOpenAiConnectAttached");
+        status = {
+          ...status,
+          activeProcess: "succeeded",
+          profileConfigured: true
+        };
+        return 0;
+      },
+      async runDashboardAttached() {
+        calls.push("runDashboardAttached");
+        status = {
+          ...status,
+          activeProcess: "running",
+          dashboardRunning: true,
+          cliProxyRunning: true
+        };
+        return 0;
+      }
+    }
+  };
+}
 
 function createFakeApiClient() {
   const calls: string[] = [];
-  let pollCount = 0;
 
   const workflowSummary = {
     id: "workflow-1",
@@ -53,91 +97,6 @@ function createFakeApiClient() {
   };
 
   const apiClient: ShannonApiClient = {
-    async startBrowserLogin(_userId, _provider, redirectUri): Promise<BrowserLoginResult> {
-      calls.push(`startBrowserLogin:${redirectUri ?? "none"}`);
-      return {
-        sessionId: "browser-session-1",
-        authorizationUrl: "https://auth.example.test/authorize",
-        state: "state-1"
-      };
-    },
-    async completeBrowserLogin() {
-      calls.push("completeBrowserLogin");
-      return {
-        profile: {
-          email: "browser@example.com",
-          name: "Browser User"
-        }
-      };
-    },
-    async startDeviceLogin(_userId, provider): Promise<DeviceLoginStartResult> {
-      calls.push(`startDeviceLogin:${provider}`);
-      return {
-        sessionId: "device-session-1",
-        verificationUri: "https://auth.example.test/device",
-        userCode: "ABCD-EFGH",
-        intervalSeconds: 0
-      };
-    },
-    async pollDeviceLogin(): Promise<DeviceLoginPollResult> {
-      calls.push("pollDeviceLogin");
-      pollCount += 1;
-
-      if (pollCount === 1) {
-        return {
-          status: "pending"
-        };
-      }
-
-      return {
-        status: "connected",
-        connection: {
-          profile: {
-            email: "device@example.com",
-            name: "Device User"
-          }
-        }
-      };
-    },
-    async logout() {
-      calls.push("logout");
-    },
-    async getConnection(userId) {
-      calls.push(`getConnection:${userId}`);
-      return {
-        profile: {
-          email: "device@example.com",
-          name: "Device User"
-        }
-      };
-    },
-    async getAuthStatus(userId) {
-      calls.push(`getAuthStatus:${userId}`);
-      return {
-        connected: true,
-        profile: {
-          email: "device@example.com",
-          name: "Device User"
-        }
-      };
-    },
-    async getProviders() {
-      calls.push("getProviders");
-      return [
-        {
-          kind: "openai",
-          label: "OpenAI",
-          status: "configured",
-          authStrategies: ["browser-oauth", "device-auth", "manual"]
-        },
-        {
-          kind: "nvidia",
-          label: "NVIDIA",
-          status: "missing-key",
-          authStrategies: ["browser-oauth", "device-auth", "manual"]
-        }
-      ];
-    },
     async startWorkflow(input) {
       calls.push(`startWorkflow:${input.url}:${input.repo}`);
       return workflowSummary;
@@ -203,10 +162,114 @@ function createFakeApiClient() {
   };
 }
 
+function createFakePipelineClient() {
+  const calls: string[] = [];
+
+  const workflowSummary = {
+    id: "workflow-1",
+    scanRunId: "workflow-1",
+    reportId: "report-1",
+    status: "running",
+    currentPhase: "pre-recon",
+    targetUrl: "http://localhost:3001",
+    repoPath: "C:/demo/repos/demo-app",
+    workspace: "demo-workspace",
+    reportPath: "./audit-logs/demo-workspace/comprehensive_security_assessment_report.md",
+    startedAt: "2026-03-13T12:00:00.000Z",
+    endedAt: null,
+    durationMs: 0,
+    totalCostUsd: 0,
+    totalTurns: 0,
+    agentCount: 13,
+    phaseHistory: [
+      {
+        phase: "pre-recon",
+        changedAt: "2026-03-13T12:00:00.000Z"
+      }
+    ],
+    agentBreakdown: [
+      {
+        id: "pre-recon",
+        label: "pre-recon",
+        status: "running",
+        durationMs: 0,
+        turns: 0,
+        costUsd: 0
+      }
+    ]
+  };
+
+  return {
+    calls,
+    pipelineClient: {
+      async startWorkflow(input: {
+        userId: string;
+        url: string;
+        repo: string;
+        config?: string;
+        output?: string;
+        workspace?: string;
+      }) {
+        calls.push(`startWorkflow:${input.url}:${input.repo}:${input.workspace ?? "none"}`);
+        return workflowSummary;
+      },
+      async getWorkflow(workflowId: string) {
+        calls.push(`getWorkflow:${workflowId}`);
+        return {
+          workflow: workflowSummary,
+          report: {
+            id: "report-1",
+            scanRunId: workflowSummary.scanRunId,
+            findingIds: ["finding-1"],
+            generatedAt: "2026-03-13T12:05:00.000Z",
+            exploitPacks: [],
+            coverageMatrix: [],
+            unsupportedClasses: []
+          },
+          findings: [],
+          logs: ["[workflow] started"]
+        };
+      },
+      async getWorkflowLogs(workflowId: string) {
+        calls.push(`getWorkflowLogs:${workflowId}`);
+        return {
+          workflowId,
+          logs: ["[workflow] started", "[workflow] completed"]
+        };
+      },
+      async getWorkspaces() {
+        calls.push("getWorkspaces");
+        return [
+          {
+            id: "demo-workspace",
+            name: "demo-workspace",
+            status: "running",
+            workflowCount: 1,
+            lastWorkflowId: "workflow-1",
+            lastRunAt: "2026-03-13T12:00:00.000Z",
+            targetUrl: "http://localhost:3001",
+            repoPath: "C:/demo/repos/demo-app"
+          }
+        ];
+      },
+      async stopRuntime(input: { clean?: boolean }) {
+        calls.push(`stopRuntime:${input.clean ? "clean" : "default"}`);
+        return {
+          status: "stopped" as const,
+          clean: input.clean ?? false,
+          message: input.clean ? "Removed workflow data" : "Stopped local runtime"
+        };
+      }
+    }
+  };
+}
+
 describe("runCli", () => {
   test("publishes Shannon-style quick start guidance", () => {
     expect(CLI_QUICK_START_HELP).toContain("git clone https://github.com/DemumuMind/demumumind-ultra-testings.git");
     expect(CLI_QUICK_START_HELP).toContain("./demumu start URL=https://example.com REPO=repo-name");
+    expect(CLI_QUICK_START_HELP).toContain("./demumu login --provider openai");
+    expect(CLI_QUICK_START_HELP).toContain("./demumu config");
     expect(CLI_QUICK_START_HELP).toContain("./demumu logs ID=workflow-1234567890");
     expect(CLI_QUICK_START_HELP).toContain("./demumu query ID=workflow-1234567890");
   });
@@ -225,6 +288,8 @@ describe("runCli", () => {
     expect(output.join("\n")).toContain("SHANNON");
     expect(output.join("\n")).toContain("AI Penetration Testing Framework");
     expect(output.join("\n")).toContain("./demumu start URL=<url> REPO=<name>");
+    expect(output.join("\n")).toContain("./demumu login --provider openai");
+    expect(output.join("\n")).toContain("./demumu config");
   });
 
   test("starts a workflow and prints the workflow summary", async () => {
@@ -323,20 +388,17 @@ describe("runCli", () => {
     expect(output.join("\n")).toContain("Daemon is unavailable. Starting it now...");
   });
 
-  test("falls back to launching the server from source when the build output is missing", () => {
+  test("builds a docker-compose bootstrap plan for the local Temporal runtime", () => {
     const plan = buildRuntimeBootstrapPlan({
       serverBaseUrl: "http://127.0.0.1:4010",
       projectRoot: "C:/demo",
-      distExists: false,
-      sourceExists: true,
-      tsxAvailable: true,
       forceLocal: true
     });
 
     expect(plan).toEqual({
-      kind: "node-tsx",
-      command: process.execPath,
-      args: ["--import", "tsx", "C:\\demo\\apps\\server\\src\\index.ts"],
+      kind: "docker-compose",
+      command: "docker",
+      args: ["compose", "up", "temporal", "worker", "-d"],
       cwd: "C:/demo",
       env: expect.objectContaining({
         HOST: "127.0.0.1",
@@ -367,6 +429,34 @@ describe("runCli", () => {
       }),
       shell: true
     });
+  });
+
+  test("prefers the temporal pipeline client for workflow commands", async () => {
+    const { apiClient, calls: apiCalls } = createFakeApiClient();
+    const { pipelineClient, calls: pipelineCalls } = createFakePipelineClient();
+    const output: string[] = [];
+
+    const exitCode = await runCli(
+      [
+        "node",
+        "cli",
+        "start",
+        "URL=http://localhost:3001",
+        "REPO=demo-app",
+        "WORKSPACE=demo-workspace"
+      ],
+      {
+        apiClient,
+        pipelineClient,
+        writeStdout: (line) => output.push(line),
+        writeStderr: (line) => output.push(line)
+      }
+    );
+
+    expect(exitCode).toBe(0);
+    expect(pipelineCalls).toContain("startWorkflow:http://localhost:3001:demo-app:demo-workspace");
+    expect(apiCalls).not.toContain("startWorkflow:http://localhost:3001:demo-app");
+    expect(output.join("\n")).toContain("Workflow started: workflow-1");
   });
 
   test("queries workflow details and pretty-prints the result", async () => {
@@ -433,17 +523,19 @@ describe("runCli", () => {
     expect(output.join("\n")).toContain("Removed workflow data");
   });
 
-  test("completes device authorization and persists the local session", async () => {
+  test("routes OpenAI login through CCS and persists the selected local user", async () => {
     const directory = await mkdtemp(join(tmpdir(), "shannon-cli-"));
 
     try {
       const { apiClient, calls } = createFakeApiClient();
+      const { ccsService, calls: ccsCalls } = createFakeCcsService();
       const output: string[] = [];
 
       const exitCode = await runCli(
-        ["node", "cli", "login", "--device-auth", "--provider", "openai", "--user", "local-user"],
+        ["node", "cli", "login", "--provider", "openai", "--user", "local-user"],
         {
           apiClient,
+          ccsService,
           sessionFilePath: join(directory, "session.json"),
           writeStdout: (line) => output.push(line),
           writeStderr: (line) => output.push(line),
@@ -452,8 +544,9 @@ describe("runCli", () => {
       );
 
       expect(exitCode).toBe(0);
-      expect(calls).toEqual(expect.arrayContaining(["startDeviceLogin:openai", "pollDeviceLogin"]));
-      expect(output.join("\n")).toContain("ABCD-EFGH");
+      expect(ccsCalls).toContain("runOpenAiConnectAttached");
+      expect(calls).toEqual([]);
+      expect(output.join("\n")).toContain("OpenAI is now configured through CCS");
 
       const session = JSON.parse(await readFile(join(directory, "session.json"), "utf8"));
       expect(session.userId).toBe("local-user");
@@ -463,5 +556,55 @@ describe("runCli", () => {
         force: true
       });
     }
+  });
+
+  test("rejects legacy OAuth login flags with CCS guidance", async () => {
+    const { apiClient } = createFakeApiClient();
+    const { ccsService } = createFakeCcsService();
+    const stderr: string[] = [];
+
+    const exitCode = await runCli(["node", "cli", "login", "--device-auth", "--provider", "openai"], {
+      apiClient,
+      ccsService,
+      writeStdout: () => undefined,
+      writeStderr: (line) => stderr.push(line)
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.join("\n")).toContain("OpenAI login now goes through CCS");
+  });
+
+  test("launches the CCS dashboard from the config command", async () => {
+    const { apiClient } = createFakeApiClient();
+    const { ccsService, calls: ccsCalls } = createFakeCcsService();
+    const output: string[] = [];
+
+    const exitCode = await runCli(["node", "cli", "config"], {
+      apiClient,
+      ccsService,
+      writeStdout: (line) => output.push(line),
+      writeStderr: (line) => output.push(line)
+    });
+
+    expect(exitCode).toBe(0);
+    expect(ccsCalls).toContain("runDashboardAttached");
+    expect(output.join("\n")).toContain("CCS dashboard started");
+  });
+
+  test("derives whoami from CCS status instead of broker sessions", async () => {
+    const { apiClient } = createFakeApiClient();
+    const { ccsService } = createFakeCcsService();
+    const output: string[] = [];
+
+    const exitCode = await runCli(["node", "cli", "whoami"], {
+      apiClient,
+      ccsService,
+      writeStdout: (line) => output.push(line),
+      writeStderr: (line) => output.push(line)
+    });
+
+    expect(exitCode).toBe(0);
+    expect(output.join("\n")).toContain("OpenAI via CCS is configured");
+    expect(output.join("\n")).toContain("codex.settings.json");
   });
 });

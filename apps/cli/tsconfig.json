@@ -1,14 +1,24 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "paths": {
+      "@shannon/core": ["./packages/core/src/index.ts"],
+      "@shannon/shared": ["./packages/shared/src/index.ts"],
+      "@shannon/worker": ["./apps/worker/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
   "references": [
     {
+      "path": "../../packages/core"
+    },
+    {
       "path": "../../packages/shared"
+    },
+    {
+      "path": "../worker"
     }
   ]
 }

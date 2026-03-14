@@ -1,8 +1,11 @@
 import {
+  ccsStatusSchema,
   confirmedFindingSchema,
+  providerDefinitionSchema,
   providerHealthSchema,
   projectConfigSchema,
   reportSchema,
+  workspaceArtifactPreviewSchema,
   workflowDetailSchema,
   workflowSummarySchema
 } from "./index.js";
@@ -198,11 +201,64 @@ describe("DemumuMind shared contracts", () => {
       envKey: "OPENAI_API_KEY",
       baseUrl: "https://api.openai.com/v1",
       status: "configured",
-      authStrategies: ["browser-oauth", "device-auth", "manual"]
+      authStrategies: ["ccs-codex", "manual"]
     });
 
     expect(detail.logs[0]).toContain("Workflow completed");
     expect(provider.kind).toBe("openai");
-    expect(provider.authStrategies[0]).toBe("browser-oauth");
+    expect(provider.authStrategies[0]).toBe("ccs-codex");
+  });
+
+  test("defaults provider auth strategies to CCS Codex plus manual env vars", () => {
+    const provider = providerDefinitionSchema.parse({
+      kind: "openai",
+      label: "OpenAI",
+      envKey: "OPENAI_API_KEY",
+      baseUrl: "https://api.openai.com/v1"
+    });
+
+    expect(provider.authStrategies).toEqual(["ccs-codex", "manual"]);
+  });
+
+  test("parses workspace artifact preview payloads for audit inspection", () => {
+    const preview = workspaceArtifactPreviewSchema.parse({
+      artifact: {
+        kind: "session",
+        label: "Session Metadata",
+        path: "C:/demo/audit-logs/demo-workspace/session.json",
+        exists: true
+      },
+      contentType: "application/json",
+      content: "{\n  \"session\": {\n    \"id\": \"demo-workspace\"\n  }\n}",
+      truncated: false
+    });
+
+    expect(preview.artifact.kind).toBe("session");
+    expect(preview.contentType).toBe("application/json");
+    expect(preview.content).toContain("demo-workspace");
+  });
+
+  test("parses CCS status payloads used by CLI, server, and web", () => {
+    const status = ccsStatusSchema.parse({
+      binaryReady: true,
+      settingsPath: "C:/Users/demo/.ccs/codex.settings.json",
+      profileConfigured: true,
+      dashboardUrl: "http://localhost:3000",
+      dashboardRunning: true,
+      cliProxyRunning: true,
+      callbackPort: 1455,
+      callbackPortReady: true,
+      localhostBindable: true,
+      firewallStatus: "warn",
+      recentLogs: ["[OK] Browser opened"],
+      recommendedFixes: [
+        'netsh advfirewall firewall add rule name="CCS OAuth" dir=in action=allow protocol=TCP localport=1455'
+      ],
+      activeProcess: "running"
+    });
+
+    expect(status.profileConfigured).toBe(true);
+    expect(status.firewallStatus).toBe("warn");
+    expect(status.activeProcess).toBe("running");
   });
 });

@@ -6,6 +6,8 @@ export interface DesktopLaunchPlan {
   webEntry: string;
   daemonEntry: string;
   daemonUrl: string;
+  runtimeComposeFile: string;
+  runtimeServices: string[];
   workspaceRoot: string;
 }
 
@@ -30,6 +32,8 @@ export function createDesktopLaunchPlan(input: DesktopLaunchPlanInput): DesktopL
       : input.env.DEMUMUMIND_WEB_URL ?? "http://127.0.0.1:4173",
     daemonEntry: normalizePath(resolve(workspaceRoot, "apps", "server", "dist", "index.js")),
     daemonUrl,
+    runtimeComposeFile: normalizePath(resolve(workspaceRoot, "docker-compose.yml")),
+    runtimeServices: ["temporal", "worker"],
     workspaceRoot: normalizePath(workspaceRoot)
   };
 }
@@ -50,6 +54,32 @@ function startManagedDaemon(plan: DesktopLaunchPlan, env: NodeJS.ProcessEnv): Ch
   });
 }
 
+function startManagedRuntime(plan: DesktopLaunchPlan, env: NodeJS.ProcessEnv): ChildProcess {
+  return spawn(
+    "docker",
+    ["compose", "-f", plan.runtimeComposeFile, "up", "-d", ...plan.runtimeServices],
+    {
+      cwd: plan.workspaceRoot,
+      env,
+      stdio: "ignore",
+      windowsHide: true
+    }
+  );
+}
+
+function stopManagedRuntime(plan: DesktopLaunchPlan, env: NodeJS.ProcessEnv): ChildProcess {
+  return spawn(
+    "docker",
+    ["compose", "-f", plan.runtimeComposeFile, "stop", ...plan.runtimeServices],
+    {
+      cwd: plan.workspaceRoot,
+      env,
+      stdio: "ignore",
+      windowsHide: true
+    }
+  );
+}
+
 export async function launchDesktopShell(
   input: Partial<DesktopLaunchPlanInput> = {}
 ): Promise<void> {
@@ -60,6 +90,7 @@ export async function launchDesktopShell(
   });
   const electron = await import("electron");
   const { app, BrowserWindow } = electron;
+  let runtimeProcess: ChildProcess | null = null;
   let daemonProcess: ChildProcess | null = null;
 
   app.on("window-all-closed", () => {
@@ -70,9 +101,12 @@ export async function launchDesktopShell(
 
   app.on("before-quit", () => {
     daemonProcess?.kill();
+    runtimeProcess?.kill();
+    void stopManagedRuntime(plan, process.env);
   });
 
   app.whenReady().then(async () => {
+    runtimeProcess = startManagedRuntime(plan, process.env);
     daemonProcess = startManagedDaemon(plan, process.env);
 
     const window = new BrowserWindow({

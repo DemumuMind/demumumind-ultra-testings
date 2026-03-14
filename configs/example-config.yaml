@@ -1,0 +1,7 @@
+pipeline:
+  retryPreset: testing
+  maxConcurrentPipelines: 3
+
+providers:
+  - openai
+  - nvidia

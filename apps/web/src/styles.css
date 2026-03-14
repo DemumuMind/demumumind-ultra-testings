@@ -200,6 +200,16 @@ textarea {
   font-size: 0.82rem;
 }
 
+.pill-ok {
+  border-color: rgba(121, 214, 208, 0.32);
+  color: var(--cyan);
+}
+
+.pill-danger {
+  border-color: rgba(255, 95, 95, 0.3);
+  color: var(--danger);
+}
+
 .workspace-list,
 .timeline {
   display: grid;
@@ -213,6 +223,68 @@ textarea {
 .stat-card {
   padding: 1rem;
   background: var(--bg-panel-strong);
+}
+
+.launch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.field-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.field input {
+  border: 1px solid var(--border);
+  border-radius: 0.95rem;
+  background: #080b13;
+  color: var(--text);
+  padding: 0.75rem 0.9rem;
+}
+
+.control-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.control-button {
+  border: 1px solid rgba(240, 197, 72, 0.24);
+  border-radius: 999px;
+  background: rgba(240, 197, 72, 0.08);
+  color: var(--text);
+  padding: 0.55rem 0.95rem;
+  cursor: pointer;
+}
+
+.control-button-danger {
+  border-color: rgba(255, 95, 95, 0.3);
+  background: rgba(255, 95, 95, 0.08);
+}
+
+.control-button-active {
+  border-color: rgba(240, 197, 72, 0.45);
+  background: rgba(240, 197, 72, 0.18);
+}
+
+.control-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.error-copy {
+  color: var(--danger);
+  margin: 0.85rem 0 0;
 }
 
 .stats-grid {
@@ -247,6 +319,59 @@ textarea {
   white-space: pre-wrap;
 }
 
+.artifact-preview {
+  min-height: 320px;
+  max-height: 520px;
+}
+
+.ccs-log-view {
+  min-height: 160px;
+  max-height: 260px;
+}
+
+.preview-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.85rem;
+  align-items: end;
+  margin-top: 1rem;
+}
+
+.artifact-filter-row,
+.preview-nav {
+  flex-wrap: wrap;
+}
+
+.preview-search {
+  margin: 0;
+}
+
+.preview-summary {
+  min-width: 96px;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.95rem;
+  background: var(--bg-panel-strong);
+}
+
+.preview-summary strong {
+  display: block;
+  color: var(--accent);
+  font-size: 1.2rem;
+}
+
+.artifact-match {
+  background: rgba(240, 197, 72, 0.24);
+  color: var(--text);
+  border-radius: 0.2rem;
+  padding: 0.02rem 0;
+}
+
+.artifact-match-active {
+  background: rgba(121, 214, 208, 0.28);
+  box-shadow: 0 0 0 1px rgba(121, 214, 208, 0.4);
+}
+
 @media (max-width: 1080px) {
   .workflow-hero {
     flex-direction: column;
@@ -265,6 +390,14 @@ textarea {
 
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .launch-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-toolbar {
+    grid-template-columns: 1fr;
   }
 }
 

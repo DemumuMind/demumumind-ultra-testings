@@ -12,12 +12,15 @@ export const attackDomainSchema = z.enum([
 
 export const scanPhaseSchema = z.enum([
   "queued",
+  "preflight",
+  "pre-recon",
   "project-intake",
   "environment-doctor",
   "source-indexing",
   "recon-surface",
   "static-reasoning",
   "dynamic-validation",
+  "vulnerability-exploitation",
   "reporting",
   "completed",
   "failed",
@@ -56,7 +59,16 @@ export const authStrategySchema = z.enum([
   "none",
   "browser-oauth",
   "device-auth",
+  "ccs-codex",
   "manual"
+]);
+export const ccsFirewallStatusSchema = z.enum(["pass", "warn", "unknown"]);
+export const ccsActiveProcessSchema = z.enum([
+  "idle",
+  "starting",
+  "running",
+  "succeeded",
+  "failed"
 ]);
 export const projectTargetKindSchema = z.enum([
   "web-app",
@@ -85,13 +97,27 @@ export const providerDefinitionSchema = z.object({
   label: z.string(),
   envKey: z.string(),
   baseUrl: z.string().url(),
-  authStrategies: z
-    .array(authStrategySchema)
-    .default(["browser-oauth", "device-auth", "manual"])
+  authStrategies: z.array(authStrategySchema).default(["ccs-codex", "manual"])
 });
 
 export const providerHealthSchema = providerDefinitionSchema.extend({
   status: providerStatusSchema
+});
+
+export const ccsStatusSchema = z.object({
+  binaryReady: z.boolean(),
+  settingsPath: z.string(),
+  profileConfigured: z.boolean(),
+  dashboardUrl: z.string().url(),
+  dashboardRunning: z.boolean(),
+  cliProxyRunning: z.boolean(),
+  callbackPort: z.number().int().positive(),
+  callbackPortReady: z.boolean(),
+  localhostBindable: z.boolean(),
+  firewallStatus: ccsFirewallStatusSchema,
+  recentLogs: z.array(z.string()),
+  recommendedFixes: z.array(z.string()),
+  activeProcess: ccsActiveProcessSchema
 });
 
 export const capabilityManifestSchema = z.object({
@@ -329,6 +355,108 @@ export const workspaceSummarySchema = z.object({
   repoPath: z.string()
 });
 
+export const workspaceResumeAttemptSchema = z.object({
+  workflowId: z.string(),
+  supersededWorkflowIds: z.array(z.string()),
+  checkpointHash: z.string()
+});
+
+export const workspaceArtifactKindSchema = z.enum([
+  "session",
+  "workflow-summary",
+  "workflow-log",
+  "report-json",
+  "final-report"
+]);
+
+export const workspaceArtifactSchema = z.object({
+  kind: workspaceArtifactKindSchema,
+  label: z.string(),
+  path: z.string(),
+  exists: z.boolean()
+});
+
+export const workspaceDetailSchema = z.object({
+  workspace: workspaceSummarySchema,
+  workflowIds: z.array(z.string()),
+  resumeAttempts: z.array(workspaceResumeAttemptSchema),
+  artifacts: z.array(workspaceArtifactSchema)
+});
+
+export const workspaceArtifactPreviewSchema = z.object({
+  artifact: workspaceArtifactSchema,
+  contentType: z.string(),
+  content: z.string(),
+  truncated: z.boolean()
+});
+
+export const pipelineRetryPresetSchema = z.enum(["default", "testing", "subscription"]);
+export const pipelineVulnTypeSchema = z.enum(["injection", "xss", "auth", "ssrf", "authz"]);
+export const pipelineAgentNameSchema = z.enum([
+  "pre-recon",
+  "recon",
+  "injection-vuln",
+  "xss-vuln",
+  "auth-vuln",
+  "ssrf-vuln",
+  "authz-vuln",
+  "injection-exploit",
+  "xss-exploit",
+  "auth-exploit",
+  "ssrf-exploit",
+  "authz-exploit",
+  "report"
+]);
+
+export const pipelineConfigSchema = z.object({
+  retryPreset: pipelineRetryPresetSchema.optional(),
+  maxConcurrentPipelines: z.number().int().positive().max(5).optional()
+});
+
+export const pipelineInputSchema = z.object({
+  webUrl: z.string().url(),
+  repoPath: z.string(),
+  workflowId: z.string(),
+  sessionId: z.string(),
+  configPath: z.string().optional(),
+  outputPath: z.string().optional(),
+  pipelineTestingMode: z.boolean().optional(),
+  resumeFromWorkspace: z.string().optional(),
+  terminatedWorkflows: z.array(z.string()).optional(),
+  pipelineConfig: pipelineConfigSchema.optional()
+});
+
+export const pipelineAgentMetricsSchema = z.object({
+  durationMs: z.number().nonnegative(),
+  costUsd: z.number().nonnegative(),
+  turns: z.number().int().nonnegative(),
+  model: z.string().nullable()
+});
+
+export const pipelineSummarySchema = z.object({
+  totalCostUsd: z.number().nonnegative(),
+  totalDurationMs: z.number().nonnegative(),
+  totalTurns: z.number().int().nonnegative(),
+  agentCount: z.number().int().nonnegative()
+});
+
+export const pipelineStateSchema = z.object({
+  status: z.enum(["running", "completed", "failed"]),
+  currentPhase: z.string().nullable(),
+  currentAgent: z.string().nullable(),
+  completedAgents: z.array(pipelineAgentNameSchema),
+  failedAgent: z.string().nullable(),
+  error: z.string().nullable(),
+  startTime: z.number().nonnegative(),
+  agentMetrics: z.record(z.string(), pipelineAgentMetricsSchema),
+  summary: pipelineSummarySchema.nullable()
+});
+
+export const pipelineProgressSchema = pipelineStateSchema.extend({
+  workflowId: z.string(),
+  elapsedMs: z.number().nonnegative()
+});
+
 export type AttackDomain = z.infer<typeof attackDomainSchema>;
 export type ScanPhase = z.infer<typeof scanPhaseSchema>;
 export type EncryptionEnvelope = z.infer<typeof encryptionEnvelopeSchema>;
@@ -341,6 +469,9 @@ export type CapabilityPermission = z.infer<typeof capabilityPermissionSchema>;
 export type ProviderKind = z.infer<typeof providerKindSchema>;
 export type ProviderDefinition = z.infer<typeof providerDefinitionSchema>;
 export type ProviderHealth = z.infer<typeof providerHealthSchema>;
+export type CcsFirewallStatus = z.infer<typeof ccsFirewallStatusSchema>;
+export type CcsActiveProcess = z.infer<typeof ccsActiveProcessSchema>;
+export type CcsStatus = z.infer<typeof ccsStatusSchema>;
 export type CapabilityManifest = z.infer<typeof capabilityManifestSchema>;
 export type ProjectPolicy = z.infer<typeof projectPolicySchema>;
 export type ProjectAuth = z.infer<typeof projectAuthSchema>;
@@ -364,3 +495,17 @@ export type WorkflowAgentSummary = z.infer<typeof workflowAgentSummarySchema>;
 export type WorkflowSummary = z.infer<typeof workflowSummarySchema>;
 export type WorkflowDetail = z.infer<typeof workflowDetailSchema>;
 export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
+export type WorkspaceResumeAttempt = z.infer<typeof workspaceResumeAttemptSchema>;
+export type WorkspaceArtifactKind = z.infer<typeof workspaceArtifactKindSchema>;
+export type WorkspaceArtifact = z.infer<typeof workspaceArtifactSchema>;
+export type WorkspaceDetail = z.infer<typeof workspaceDetailSchema>;
+export type WorkspaceArtifactPreview = z.infer<typeof workspaceArtifactPreviewSchema>;
+export type PipelineRetryPreset = z.infer<typeof pipelineRetryPresetSchema>;
+export type PipelineVulnType = z.infer<typeof pipelineVulnTypeSchema>;
+export type PipelineAgentName = z.infer<typeof pipelineAgentNameSchema>;
+export type PipelineConfig = z.infer<typeof pipelineConfigSchema>;
+export type PipelineInput = z.infer<typeof pipelineInputSchema>;
+export type PipelineAgentMetrics = z.infer<typeof pipelineAgentMetricsSchema>;
+export type PipelineSummary = z.infer<typeof pipelineSummarySchema>;
+export type PipelineState = z.infer<typeof pipelineStateSchema>;
+export type PipelineProgress = z.infer<typeof pipelineProgressSchema>;

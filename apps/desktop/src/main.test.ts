@@ -12,6 +12,8 @@ describe("createDesktopLaunchPlan", () => {
     expect(plan.daemonUrl).toBe("http://127.0.0.1:4000");
     expect(plan.webEntry).toContain("apps/web/dist/index.html");
     expect(plan.daemonEntry).toContain("apps/server/dist/index.js");
+    expect(plan.runtimeComposeFile).toContain("docker-compose.yml");
+    expect(plan.runtimeServices).toEqual(["temporal", "worker"]);
   });
 
   test("prefers explicit development URLs when running the desktop shell locally", () => {
@@ -26,5 +28,6 @@ describe("createDesktopLaunchPlan", () => {
 
     expect(plan.webEntry).toBe("http://127.0.0.1:4173");
     expect(plan.daemonUrl).toBe("http://127.0.0.1:4100");
+    expect(plan.runtimeComposeFile).toContain("docker-compose.yml");
   });
 });

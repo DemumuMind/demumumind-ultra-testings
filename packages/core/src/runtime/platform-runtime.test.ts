@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   CapabilityRegistry,
+  CcsCodexService,
   EnvironmentDoctor,
   ProjectBootstrapService,
   ProviderCatalogService
@@ -10,6 +11,26 @@ import {
 
 describe("DemumuMind runtime services", () => {
   test("reports Windows readiness and provider health for OpenAI and NVIDIA", async () => {
+    const ccsService = {
+      getStatus: async () => ({
+        binaryReady: true,
+        settingsPath: "C:/Users/demo/.ccs/codex.settings.json",
+        profileConfigured: true,
+        dashboardUrl: "http://localhost:3000",
+        dashboardRunning: true,
+        cliProxyRunning: true,
+        callbackPort: 1455,
+        callbackPortReady: true,
+        localhostBindable: true,
+        firewallStatus: "warn" as const,
+        recentLogs: [],
+        recommendedFixes: [
+          'netsh advfirewall firewall add rule name="CCS OAuth" dir=in action=allow protocol=TCP localport=1455'
+        ],
+        activeProcess: "idle" as const
+      })
+    } satisfies Pick<CcsCodexService, "getStatus">;
+
     const doctor = new EnvironmentDoctor({
       env: {
         OPENAI_API_KEY: "sk-openai",
@@ -17,15 +38,17 @@ describe("DemumuMind runtime services", () => {
       },
       platform: "win32",
       nodeVersion: "v22.14.0",
-      powerShellVersion: "7.4.6"
+      powerShellVersion: "7.4.6",
+      ccsService
     });
 
     const report = await doctor.inspect();
-    const providers = new ProviderCatalogService({
+    const providers = await new ProviderCatalogService({
       env: {
         OPENAI_API_KEY: "sk-openai",
         NVIDIA_API_KEY: ""
-      }
+      },
+      ccsService
     }).list();
     const capabilities = new CapabilityRegistry().list({
       maxPermission: "safe"
@@ -33,7 +56,14 @@ describe("DemumuMind runtime services", () => {
 
     expect(report.status).toBe("needs-attention");
     expect(report.checks.map((check) => check.id)).toEqual(
-      expect.arrayContaining(["windows-platform", "powershell", "node-runtime"])
+      expect.arrayContaining([
+        "windows-platform",
+        "powershell",
+        "node-runtime",
+        "ccs-binary",
+        "ccs-profile",
+        "ccs-firewall"
+      ])
     );
     expect(providers.find((provider) => provider.kind === "openai")?.status).toBe("configured");
     expect(providers.find((provider) => provider.kind === "nvidia")?.status).toBe("missing-key");

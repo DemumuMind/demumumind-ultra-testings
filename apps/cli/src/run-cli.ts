@@ -4,15 +4,24 @@ import { existsSync } from "node:fs";
 import { homedir, hostname, networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { FetchShannonApiClient, type ShannonApiClient } from "./api-client.js";
 import {
-  startLocalCallbackServer,
-  type BrowserCallbackServer
-} from "./browser-callback-server.js";
+  CcsCodexService,
+  EnvironmentDoctor,
+  ProviderCatalogService
+} from "@shannon/core";
+import { TemporalPipelineClient, type WorkflowRuntimeClient } from "@shannon/worker";
+import type { ShannonApiClient } from "./api-client.js";
 import { clearSession, loadSession, saveSession } from "./session-store.js";
 
 interface RunCliDependencies {
   apiClient?: ShannonApiClient;
+  pipelineClient?: WorkflowRuntimeClient;
+  ccsService?: Pick<
+    CcsCodexService,
+    "getStatus" | "runOpenAiConnectAttached" | "runDashboardAttached"
+  >;
+  providerCatalog?: Pick<ProviderCatalogService, "list">;
+  environmentDoctor?: Pick<EnvironmentDoctor, "inspect">;
   serverBaseUrl?: string;
   sessionFilePath?: string;
   writeStdout?: (line: string) => void;
@@ -20,12 +29,6 @@ interface RunCliDependencies {
   sleep?: (milliseconds: number) => Promise<void>;
   checkRuntimeHealth?: () => Promise<boolean>;
   startRuntime?: () => Promise<void>;
-  createBrowserCallbackServer?: (input: {
-    host: string;
-    port: number;
-    callbackPath: string;
-  }) => Promise<BrowserCallbackServer>;
-  openBrowser?: (url: string) => Promise<boolean>;
 }
 
 const DEFAULT_USER_ID = "local-cli-user";
@@ -36,7 +39,7 @@ const RUNTIME_READY_POLL_INTERVAL_MS = 250;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "0.0.0.0", "::1", "::"]);
 
 interface RuntimeBootstrapPlan {
-  kind: "custom-command" | "node-dist" | "node-tsx" | "pnpm-tsx";
+  kind: "custom-command" | "docker-compose";
   command: string;
   args: string[];
   cwd: string;
@@ -63,7 +66,8 @@ Quick Start
   pnpm build
 
   Configure providers (choose one)
-  ./demumu login --device-auth --provider openai
+  ./demumu login --provider openai
+  ./demumu config
   export OPENAI_API_KEY="your-api-key"
 
   Start a workflow
@@ -93,11 +97,12 @@ function renderHelp(): string {
     "  ./demumu logs ID=<workflow-id>",
     "  ./demumu query ID=<workflow-id>",
     "  ./demumu stop [CLEAN=true]",
+    "  ./demumu config",
     "  ./demumu help",
     "",
     "Provider auth:",
-    "  ./demumu login --device-auth --provider openai",
-    "  ./demumu login --provider nvidia",
+    "  ./demumu login --provider openai",
+    "  Set NVIDIA_API_KEY for NVIDIA access",
     "",
     CLI_QUICK_START_HELP.trim()
   ].join("\n");
@@ -201,30 +206,6 @@ function parseFlagArgs(args: string[]): {
   };
 }
 
-async function openBrowserUrl(url: string): Promise<boolean> {
-  try {
-    let command = "xdg-open";
-    let args = [url];
-
-    if (process.platform === "win32") {
-      command = "cmd.exe";
-      args = ["/c", "start", "", url];
-    } else if (process.platform === "darwin") {
-      command = "open";
-      args = [url];
-    }
-
-    const child = spawn(command, args, {
-      detached: true,
-      stdio: "ignore"
-    });
-    child.unref();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function resolveBootstrapCommand(override?: string): string | undefined {
   const value =
     override ??
@@ -296,11 +277,7 @@ export function buildRuntimeBootstrapPlan(input: {
   serverBaseUrl: string;
   projectRoot?: string;
   bootstrapCommand?: string;
-  distExists?: boolean;
-  sourceExists?: boolean;
-  tsxAvailable?: boolean;
   forceLocal?: boolean;
-  platform?: NodeJS.Platform;
 }): RuntimeBootstrapPlan | null {
   const projectRoot = input.projectRoot ?? PROJECT_ROOT;
   const bootstrapCommand = resolveBootstrapCommand(input.bootstrapCommand);
@@ -324,50 +301,18 @@ export function buildRuntimeBootstrapPlan(input: {
     };
   }
 
-  const serverEntryPoint = join(projectRoot, "apps", "server", "dist", "index.js");
-  const sourceEntryPoint = join(projectRoot, "apps", "server", "src", "index.ts");
-  const distExists = input.distExists ?? existsSync(serverEntryPoint);
-  const sourceExists = input.sourceExists ?? existsSync(sourceEntryPoint);
-  const tsxAvailable = input.tsxAvailable ?? existsSync(join(projectRoot, "node_modules", "tsx"));
-
   if (!input.forceLocal) {
     return null;
   }
 
-  if (distExists) {
-    return {
-      kind: "node-dist",
-      command: process.execPath,
-      args: [serverEntryPoint],
-      cwd: projectRoot,
-      env: runtimeEnv,
-      shell: false
-    };
-  }
-
-  if (sourceExists && tsxAvailable) {
-    return {
-      kind: "node-tsx",
-      command: process.execPath,
-      args: ["--import", "tsx", sourceEntryPoint],
-      cwd: projectRoot,
-      env: runtimeEnv,
-      shell: false
-    };
-  }
-
-  if (sourceExists) {
-    return {
-      kind: "pnpm-tsx",
-      command: (input.platform ?? process.platform) === "win32" ? "pnpm.cmd" : "pnpm",
-      args: ["exec", "tsx", sourceEntryPoint],
-      cwd: projectRoot,
-      env: runtimeEnv,
-      shell: false
-    };
-  }
-
-  return null;
+  return {
+    kind: "docker-compose",
+    command: "docker",
+    args: ["compose", "up", "temporal", "worker", "-d"],
+    cwd: projectRoot,
+    env: runtimeEnv,
+    shell: false
+  };
 }
 
 async function startRuntimeProcess(serverBaseUrl: string): Promise<void> {
@@ -465,9 +410,15 @@ function printWorkflowSummary(
 
 export async function runCli(argv: string[], dependencies: RunCliDependencies = {}): Promise<number> {
   const serverBaseUrl = resolveServerBaseUrl(dependencies.serverBaseUrl);
-  const apiClient =
-    dependencies.apiClient ??
-    new FetchShannonApiClient(serverBaseUrl);
+  const pipelineClient =
+    dependencies.pipelineClient ??
+    (dependencies.apiClient as unknown as WorkflowRuntimeClient | undefined) ??
+    new TemporalPipelineClient();
+  const ccsService = dependencies.ccsService ?? new CcsCodexService();
+  const providerCatalog =
+    dependencies.providerCatalog ?? new ProviderCatalogService({ ccsService });
+  const environmentDoctor =
+    dependencies.environmentDoctor ?? new EnvironmentDoctor({ ccsService });
   const sessionFilePath = resolveSessionFilePath(dependencies.sessionFilePath);
   const writeStdout = dependencies.writeStdout ?? ((line: string) => console.log(line));
   const writeStderr = dependencies.writeStderr ?? ((line: string) => console.error(line));
@@ -475,11 +426,11 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
     dependencies.sleep ??
     ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
   const checkRuntimeHealth =
-    dependencies.checkRuntimeHealth ?? (() => probeRuntimeHealth(serverBaseUrl));
+    dependencies.checkRuntimeHealth ??
+    (dependencies.pipelineClient || dependencies.apiClient
+      ? async () => true
+      : () => pipelineClient.checkRuntimeHealth());
   const startRuntime = dependencies.startRuntime ?? (() => startRuntimeProcess(serverBaseUrl));
-  const createBrowserCallbackServer =
-    dependencies.createBrowserCallbackServer ?? startLocalCallbackServer;
-  const openBrowser = dependencies.openBrowser ?? openBrowserUrl;
 
   const normalized = normalizeCliArgv(argv);
   const command = normalized[2]?.toLowerCase();
@@ -509,7 +460,7 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
           startRuntime
         });
 
-        const workflow = await apiClient.startWorkflow({
+        const workflow = await pipelineClient.startWorkflow({
           userId: await requireSessionUserId(sessionFilePath),
           url,
           repo,
@@ -529,7 +480,7 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
           throw new Error("Usage: ./demumu query ID=<workflow-id>");
         }
 
-        printJson(writeStdout, await apiClient.getWorkflow(workflowId));
+        printJson(writeStdout, await pipelineClient.getWorkflow(workflowId));
         return 0;
       }
 
@@ -541,7 +492,7 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
           throw new Error("Usage: ./demumu logs ID=<workflow-id>");
         }
 
-        const response = await apiClient.getWorkflowLogs(workflowId);
+        const response = await pipelineClient.getWorkflowLogs(workflowId);
 
         for (const line of response.logs) {
           writeStdout(line);
@@ -551,7 +502,7 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
       }
 
       case "workspaces": {
-        const workspaces = await apiClient.getWorkspaces();
+        const workspaces = await pipelineClient.getWorkspaces();
 
         if (workspaces.length === 0) {
           writeStdout("No workspaces found.");
@@ -570,21 +521,48 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
       case "stop": {
         const kv = parseKeyValueArgs(args);
         const clean = kv.CLEAN?.toLowerCase() === "true";
-        const result = await apiClient.stopRuntime({
+        const result = await pipelineClient.stopRuntime({
           clean
         });
         writeStdout(result.message);
         return 0;
       }
 
-      case "doctor":
       case "providers": {
-        const providers = await apiClient.getProviders();
+        const providers = await providerCatalog.list();
 
         for (const provider of providers) {
           writeStdout(
             `${provider.label} (${provider.kind}): ${provider.status} [${provider.authStrategies.join(" -> ")}]`
           );
+        }
+
+        return 0;
+      }
+
+      case "doctor": {
+        const report = await environmentDoctor.inspect();
+
+        writeStdout(`Doctor status: ${report.status}`);
+        writeStdout("");
+
+        for (const check of report.checks) {
+          writeStdout(`- ${check.label}: ${check.status} - ${check.summary}`);
+
+          if (check.remediation) {
+            writeStdout(`  remediation: ${check.remediation}`);
+          }
+        }
+
+        return 0;
+      }
+
+      case "config": {
+        writeStdout("CCS dashboard started. Press Ctrl+C to stop.");
+        const exitCode = await ccsService.runDashboardAttached();
+
+        if (exitCode !== 0) {
+          throw new Error(`ccs config exited with code ${exitCode}`);
         }
 
         return 0;
@@ -598,95 +576,55 @@ export async function runCli(argv: string[], dependencies: RunCliDependencies = 
             : "openai";
         const userId = values.user ?? DEFAULT_USER_ID;
 
-        if (flags.has("device-auth")) {
-          const started = await apiClient.startDeviceLogin(userId, provider);
-          writeStdout(`Open this URL in your browser: ${started.verificationUri}`);
-          writeStdout(`Enter this code: ${started.userCode}`);
-
-          for (;;) {
-            const polled = await apiClient.pollDeviceLogin({
-              userId,
-              sessionId: started.sessionId
-            });
-
-            if (polled.status === "connected") {
-              await saveSession(sessionFilePath, {
-                userId
-              });
-              writeStdout(`Connected as ${polled.connection.profile.email}`);
-              return 0;
-            }
-
-            await sleep(Math.max(started.intervalSeconds, 0) * 1000);
-          }
+        if (
+          flags.has("device-auth") ||
+          flags.has("browser-auth") ||
+          Object.hasOwn(values, "callback-host") ||
+          Object.hasOwn(values, "callback-port")
+        ) {
+          throw new Error(
+            "OpenAI login now goes through CCS. Use `./demumu login --provider openai` or `./demumu config`."
+          );
         }
 
-        const callbackHost = values["callback-host"] ?? "127.0.0.1";
-        const callbackPort = Number(values["callback-port"] ?? "1455");
-
-        if (!Number.isInteger(callbackPort) || callbackPort <= 0) {
-          throw new Error("--callback-port must be a positive integer");
+        if (provider === "nvidia") {
+          throw new Error(
+            "NVIDIA uses manual authentication only. Set `NVIDIA_API_KEY` instead of using `./demumu login`."
+          );
         }
 
-        const callbackServer = await createBrowserCallbackServer({
-          host: callbackHost,
-          port: callbackPort,
-          callbackPath: "/auth/callback"
+        const exitCode = await ccsService.runOpenAiConnectAttached();
+
+        if (exitCode !== 0) {
+          throw new Error(`ccs codex --auth --add exited with code ${exitCode}`);
+        }
+
+        await saveSession(sessionFilePath, {
+          userId
         });
-        writeStdout(
-          `Starting local login server on ${callbackServer.redirectUri.replace("/auth/callback", "")}.`
-        );
-
-        try {
-          const started = await apiClient.startBrowserLogin(userId, provider, callbackServer.redirectUri);
-          const opened = await openBrowser(started.authorizationUrl);
-
-          if (!opened) {
-            writeStdout("If your browser did not open, navigate to this URL to authenticate:");
-          }
-
-          writeStdout(started.authorizationUrl);
-
-          const callback = await callbackServer.waitForCallback();
-          const completed = await apiClient.completeBrowserLogin({
-            userId,
-            code: callback.code,
-            state: callback.state
-          });
-          await saveSession(sessionFilePath, {
-            userId
-          });
-          writeStdout(`Connected as ${completed.profile.email}`);
-          return 0;
-        } finally {
-          await callbackServer.close();
-        }
+        const ccsStatus = await ccsService.getStatus();
+        writeStdout("OpenAI is now configured through CCS.");
+        writeStdout(`CCS profile: ${ccsStatus.settingsPath}`);
+        return 0;
       }
 
       case "logout": {
-        const userId = await requireSessionUserId(sessionFilePath);
-        await apiClient.logout(userId);
         await clearSession(sessionFilePath);
-        writeStdout("Logged out");
+        writeStdout(
+          "Broker logout has been removed. Manage OpenAI access through `ccs config` or by updating your CCS profile."
+        );
         return 0;
       }
 
       case "whoami": {
-        const session = await loadSession(sessionFilePath);
+        const status = await ccsService.getStatus();
 
-        if (!session) {
-          writeStdout("Not connected");
+        if (!status.profileConfigured) {
+          writeStdout("OpenAI via CCS is not configured.");
           return 0;
         }
 
-        const connection = await apiClient.getConnection(session.userId);
-
-        if (!connection) {
-          writeStdout(`Session exists for ${session.userId}, but no server-side connection is linked.`);
-          return 0;
-        }
-
-        writeStdout(`${connection.profile.name} <${connection.profile.email}>`);
+        writeStdout(`OpenAI via CCS is configured: ${status.settingsPath}`);
         return 0;
       }
 
