@@ -1,1 +1,0 @@
-Produce a short markdown summary of the repository target and intended scan scope.
