@@ -125,6 +125,18 @@ load_openai_oauth_token() {
   return 0
 }
 
+show_openai_oauth_login_help() {
+  cat << 'EOF'
+ERROR: OPENAI_OAUTH=true requires an active Codex login.
+
+Authenticate with OpenAI OAuth first:
+  codex login
+
+On a remote or headless machine, use:
+  codex login --device-auth
+EOF
+}
+
 # Check if Temporal is running and healthy
 is_temporal_ready() {
   compose_cmd exec -T temporal \
@@ -177,7 +189,7 @@ cmd_start() {
       if load_openai_oauth_token; then
         echo "Using OpenAI OAuth token from Codex login"
       else
-        echo "ERROR: OPENAI_OAUTH=true but no Codex OAuth token was found at ~/.codex/auth.json"
+        show_openai_oauth_login_help
         exit 1
       fi
     elif [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
