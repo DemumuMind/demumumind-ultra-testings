@@ -47,6 +47,33 @@ resolve_node_bin() {
 
 NODE_BIN="$(resolve_node_bin)"
 
+resolve_codex_bin() {
+  if command -v codex >/dev/null 2>&1; then
+    command -v codex
+    return 0
+  fi
+  if command -v codex.exe >/dev/null 2>&1; then
+    command -v codex.exe
+    return 0
+  fi
+  return 1
+}
+
+CODEX_BIN="$(resolve_codex_bin || true)"
+
+run_codex_command() {
+  if command -v cmd.exe >/dev/null 2>&1; then
+    cmd.exe /d /c codex "$@"
+    return $?
+  fi
+
+  if [ -z "$CODEX_BIN" ]; then
+    return 1
+  fi
+
+  "$CODEX_BIN" "$@"
+}
+
 show_help() {
   cat << 'EOF'
 
@@ -74,7 +101,7 @@ Options for 'start':
   WORKSPACE=<name>       Named workspace (auto-resumes if exists, creates if new)
   PIPELINE_TESTING=true  Use minimal prompts for fast testing
   ROUTER=true            Route requests through claude-code-router (multi-model support)
-  OPENAI_OAUTH=true      Use Codex ChatGPT/OpenAI OAuth token for router OpenAI auth
+  OPENAI_OAUTH=true      Use Codex login OAuth for router OpenAI auth (run 'codex login' first)
 
 Options for 'stop':
   CLEAN=true             Remove all data including volumes
@@ -114,8 +141,21 @@ parse_args() {
   done
 }
 
+require_codex_login() {
+  local status_output
+
+  if ! command -v cmd.exe >/dev/null 2>&1 && [ -z "$CODEX_BIN" ]; then
+    return 1
+  fi
+
+  status_output="$(run_codex_command login status 2>&1)" || return 1
+  printf '%s' "$status_output" | grep -q "Logged in"
+}
+
 load_openai_oauth_token() {
   local auth_path token
+
+  require_codex_login || return 1
 
   auth_path="$("$NODE_BIN" -e "const fs=require('fs'); const os=require('os'); const path=require('path'); const candidates=[]; const add=(p)=>{ if (p && !candidates.includes(p)) candidates.push(p); }; add(path.join(process.env.USERPROFILE || '', '.codex', 'auth.json')); add(path.join(process.env.HOME || '', '.codex', 'auth.json')); add(path.join(os.homedir(), '.codex', 'auth.json')); const home=process.env.HOME || ''; const match=home.match(/^\/home\/([^/]+)$/); if (match) add(path.posix.join('/mnt/c/Users', match[1], '.codex', 'auth.json')); const found=candidates.find((p)=>p && fs.existsSync(p)); if (!found) process.exit(1); process.stdout.write(found);")" || return 1
 
@@ -131,6 +171,9 @@ ERROR: OPENAI_OAUTH=true requires an active Codex login.
 
 Authenticate with OpenAI OAuth first:
   codex login
+
+The terminal will show a browser URL. Open it, sign in at auth.openai.com,
+and wait for Codex CLI to confirm the login locally.
 
 On a remote or headless machine, use:
   codex login --device-auth
@@ -192,10 +235,6 @@ cmd_start() {
         show_openai_oauth_login_help
         exit 1
       fi
-    elif [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
-      if load_openai_oauth_token; then
-        echo "Using OpenAI OAuth token from Codex login"
-      fi
     fi
   fi
 
@@ -251,7 +290,8 @@ cmd_start() {
       echo "ERROR: Set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in .env"
       echo "       (or use CLAUDE_CODE_USE_BEDROCK=1 for AWS Bedrock,"
       echo "        CLAUDE_CODE_USE_VERTEX=1 for Google Vertex AI,"
-      echo "        or ROUTER=true with OPENAI_API_KEY or OPENROUTER_API_KEY)"
+      echo "        or ROUTER=true with OPENAI_API_KEY / OPENROUTER_API_KEY,"
+      echo "        or run 'codex login' first and then use ROUTER=true OPENAI_OAUTH=true)"
       exit 1
     fi
   fi
