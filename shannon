@@ -74,6 +74,7 @@ Options for 'start':
   WORKSPACE=<name>       Named workspace (auto-resumes if exists, creates if new)
   PIPELINE_TESTING=true  Use minimal prompts for fast testing
   ROUTER=true            Route requests through claude-code-router (multi-model support)
+  OPENAI_OAUTH=true      Use Codex ChatGPT/OpenAI OAuth token for router OpenAI auth
 
 Options for 'stop':
   CLEAN=true             Remove all data including volumes
@@ -83,6 +84,7 @@ Examples:
   ./shannon start URL=https://example.com REPO=repo-name WORKSPACE=q1-audit
   ./shannon start URL=https://example.com REPO=repo-name CONFIG=./config.yaml
   ./shannon start URL=https://example.com REPO=repo-name OUTPUT=./my-reports
+  ./shannon start URL=https://example.com REPO=repo-name ROUTER=true OPENAI_OAUTH=true
   ./shannon workspaces
   ./shannon logs
   ./shannon query ID=example.com_shannon-1234567890
@@ -106,9 +108,21 @@ parse_args() {
       PIPELINE_TESTING=*) PIPELINE_TESTING="${arg#PIPELINE_TESTING=}" ;;
       REBUILD=*) REBUILD="${arg#REBUILD=}" ;;
       ROUTER=*) ROUTER="${arg#ROUTER=}" ;;
+      OPENAI_OAUTH=*) OPENAI_OAUTH="${arg#OPENAI_OAUTH=}" ;;
       WORKSPACE=*) WORKSPACE="${arg#WORKSPACE=}" ;;
     esac
   done
+}
+
+load_openai_oauth_token() {
+  local auth_path token
+
+  auth_path="$("$NODE_BIN" -e "const fs=require('fs'); const os=require('os'); const path=require('path'); const candidates=[]; const add=(p)=>{ if (p && !candidates.includes(p)) candidates.push(p); }; add(path.join(process.env.USERPROFILE || '', '.codex', 'auth.json')); add(path.join(process.env.HOME || '', '.codex', 'auth.json')); add(path.join(os.homedir(), '.codex', 'auth.json')); const home=process.env.HOME || ''; const match=home.match(/^\/home\/([^/]+)$/); if (match) add(path.posix.join('/mnt/c/Users', match[1], '.codex', 'auth.json')); const found=candidates.find((p)=>p && fs.existsSync(p)); if (!found) process.exit(1); process.stdout.write(found);")" || return 1
+
+  token="$("$NODE_BIN" -e "const fs=require('fs'); const auth=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); const token=auth.tokens && auth.tokens.access_token; if (!token) process.exit(1); process.stdout.write(token);" "$auth_path" 2>/dev/null)" || return 1
+
+  export OPENAI_API_KEY="$token"
+  return 0
 }
 
 # Check if Temporal is running and healthy
@@ -157,6 +171,21 @@ ensure_containers() {
 
 cmd_start() {
   parse_args "$@"
+
+  if [ "$ROUTER" = "true" ]; then
+    if [ "$OPENAI_OAUTH" = "true" ]; then
+      if load_openai_oauth_token; then
+        echo "Using OpenAI OAuth token from Codex login"
+      else
+        echo "ERROR: OPENAI_OAUTH=true but no Codex OAuth token was found at ~/.codex/auth.json"
+        exit 1
+      fi
+    elif [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
+      if load_openai_oauth_token; then
+        echo "Using OpenAI OAuth token from Codex login"
+      fi
+    fi
+  fi
 
   # Validate required vars
   if [ -z "$URL" ] || [ -z "$REPO" ]; then
@@ -359,6 +388,24 @@ cmd_workspaces() {
   "$NODE_BIN" dist/temporal/workspaces.js
 }
 
+run_query_script() {
+  local workflow_id="$1"
+
+  if [ -f "dist/temporal/query.js" ]; then
+    "$NODE_BIN" dist/temporal/query.js "$workflow_id"
+    return 0
+  fi
+
+  if compose_cmd ps worker 2>/dev/null | grep -Eq "Up|running|healthy"; then
+    compose_cmd exec -T worker node dist/temporal/query.js "$workflow_id"
+    return 0
+  fi
+
+  echo "ERROR: Query runtime not found."
+  echo "Run 'npm run build' to generate dist/temporal/query.js, or start Shannon containers first."
+  exit 1
+}
+
 cmd_query() {
   parse_args "$@"
 
@@ -368,7 +415,7 @@ cmd_query() {
     exit 1
   fi
 
-  "$NODE_BIN" dist/temporal/query.js "$ID"
+  run_query_script "$ID"
 }
 
 cmd_stop() {
