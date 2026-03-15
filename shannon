@@ -63,7 +63,7 @@ Usage:
   ./shannon start URL=<url> REPO=<name>   Start a pentest workflow
   ./shannon workspaces                    List all workspaces
   ./shannon query ID=<workflow-id>       Show workflow status and live progress
-  ./shannon logs ID=<workflow-id>         Tail logs for a specific workflow
+  ./shannon logs [ID=<workflow-id>]      Tail worker logs or a specific workflow log
   ./shannon stop                          Stop all containers
   ./shannon help                          Show this help message
 
@@ -84,6 +84,7 @@ Examples:
   ./shannon start URL=https://example.com REPO=repo-name CONFIG=./config.yaml
   ./shannon start URL=https://example.com REPO=repo-name OUTPUT=./my-reports
   ./shannon workspaces
+  ./shannon logs
   ./shannon query ID=example.com_shannon-1234567890
   ./shannon logs ID=example.com_shannon-1234567890
   ./shannon stop CLEAN=true
@@ -303,9 +304,8 @@ cmd_logs() {
   parse_args "$@"
 
   if [ -z "$ID" ]; then
-    echo "ERROR: ID is required"
-    echo "Usage: ./shannon logs ID=<workflow-id>"
-    exit 1
+    compose_cmd logs -f worker
+    return 0
   fi
 
   # Auto-discover the workflow log file

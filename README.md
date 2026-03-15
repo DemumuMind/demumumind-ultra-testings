@@ -179,8 +179,8 @@ Shannon will build the containers, start the workflow, and return a workflow ID.
 ### Monitoring Progress
 
 ```bash
-# Tail workflow-specific logs
-./shannon logs ID=shannon-1234567890
+# View real-time worker logs
+./shannon logs
 
 # Query a specific workflow's progress
 ./shannon query ID=shannon-1234567890

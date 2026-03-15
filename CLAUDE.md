@@ -25,7 +25,7 @@ git clone https://github.com/org/repo.git ./repos/my-repo
 ./shannon workspaces                                          # List all workspaces
 
 # Monitor
-./shannon logs ID=example.com_shannon-1234567890
+./shannon logs                      # Real-time worker logs
 ./shannon query ID=example.com_shannon-1234567890
 # Temporal Web UI: http://localhost:8233
 
