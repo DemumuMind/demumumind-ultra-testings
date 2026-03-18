@@ -1,0 +1,35 @@
+{
+  "session": {
+    "id": "mcp-tool-live-nvidia",
+    "webUrl": "https://demumumind.github.io/mcp-tool/",
+    "status": "failed",
+    "createdAt": "2026-03-15T15:09:37.049Z",
+    "resumeAttempts": [],
+    "originalWorkflowId": "mcp-tool-live-nvidia_shannon-1773587376639",
+    "repoPath": "/repos/mcp-tool-live",
+    "completedAt": "2026-03-15T17:57:48.482Z"
+  },
+  "metrics": {
+    "total_duration_ms": 0,
+    "total_cost_usd": 0,
+    "phases": {},
+    "agents": {
+      "pre-recon": {
+        "status": "in-progress",
+        "attempts": [
+          {
+            "attempt_number": 3,
+            "duration_ms": 259709,
+            "cost_usd": 0,
+            "success": false,
+            "timestamp": "2026-03-15T17:57:48.117Z",
+            "model": "minimaxai/minimax-m2.5",
+            "error": "Agent pre-recon failed output validation"
+          }
+        ],
+        "final_duration_ms": 0,
+        "total_cost_usd": 0
+      }
+    }
+  }
+}

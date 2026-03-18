@@ -1,0 +1,10 @@
+========================================
+Agent: pre-recon
+Attempt: 4
+Started: 2026-03-15T16:57:56.792Z
+Session: mcp-tool-gpt53
+Web URL: https://demumumind.github.io/mcp-tool/
+========================================
+{"type":"agent_start","timestamp":"2026-03-15T16:57:56.798Z","data":{"agentName":"pre-recon","attemptNumber":4,"timestamp":"2026-03-15T16:57:56.798Z"}}
+{"type":"llm_response","timestamp":"2026-03-15T17:02:15.641Z","data":{"turn":1,"content":"API Error: Unable to connect to API (EAI_AGAIN)","timestamp":"2026-03-15T17:02:15.641Z"}}
+{"type":"agent_end","timestamp":"2026-03-15T17:02:16.444Z","data":{"agentName":"pre-recon","success":false,"duration_ms":258854,"cost_usd":0,"timestamp":"2026-03-15T17:02:16.444Z"}}

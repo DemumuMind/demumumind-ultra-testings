@@ -1,0 +1,10 @@
+========================================
+Agent: pre-recon
+Attempt: 1
+Started: 2026-03-15T16:39:11.473Z
+Session: mcp-tool-security-openai
+Web URL: https://demumumind.github.io/mcp-tool/
+========================================
+{"type":"agent_start","timestamp":"2026-03-15T16:39:11.481Z","data":{"agentName":"pre-recon","attemptNumber":1,"timestamp":"2026-03-15T16:39:11.481Z"}}
+{"type":"error","timestamp":"2026-03-15T16:39:18.484Z","data":{"message":"Authentication failed: Failed to authenticate. API Error: 403 {\"error\":{\"type\":\"trial_expired\",\"message\":\"Your trial has ex","errorType":"PentestError","stack":"PentestError: Authentication failed: Failed to authenticate. API Error: 403 {\"error\":{\"type\":\"trial_expired\",\"message\":\"Your trial has ex\n    at handleStructuredError (file:///app/dist/ai/message-handlers.js:82:30)\n    at handleAssistantMessage (file:///app/dist/ai/message-handlers.js:116:26)\n    at dispatchMessage (file:///app/dist/ai/message-handlers.js:189:37)\n    at processMessageStream (file:///app/dist/ai/claude-executor.js:268:38)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async runClaudePrompt (file:///app/dist/ai/claude-executor.js:199:35)\n    at async AgentExecutionService.execute (file:///app/dist/services/agent-execution.js:64:24)\n    at async AgentExecutionService.executeOrThrow (file:///app/dist/services/agent-execution.js:148:24)\n    at async runAgentActivity (file:///app/dist/temporal/activities.js:97:27)\n    at async Activity.execute (/app/node_modules/@temporalio/worker/lib/activity.js:101:20)","duration":7001,"turns":0,"timestamp":"2026-03-15T16:39:18.484Z"}}
+{"type":"agent_end","timestamp":"2026-03-15T16:39:22.919Z","data":{"agentName":"pre-recon","success":false,"duration_ms":7001,"cost_usd":0,"timestamp":"2026-03-15T16:39:22.919Z"}}

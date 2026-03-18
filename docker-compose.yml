@@ -70,7 +70,8 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - ROUTER_DEFAULT=${ROUTER_DEFAULT:-openai,gpt-4o}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - ROUTER_DEFAULT=${ROUTER_DEFAULT:-openai,gpt-5.3-codex}
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3456/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 10s

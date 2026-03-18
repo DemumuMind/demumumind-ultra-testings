@@ -1,0 +1,27 @@
+================================================================================
+Shannon Pentest - Workflow Log
+================================================================================
+Workflow ID: mcp-tool-nvidia
+Target URL:  https://demumumind.github.io/mcp-tool/
+Started:     2026-03-15T14:49:14.577Z
+================================================================================
+
+[2026-03-15 14:49:14] [PHASE] Starting: pre-recon
+[2026-03-15 14:49:16] [AGENT] pre-recon: Starting (attempt 1)
+[2026-03-15 16:43:07] [AGENT] pre-recon: Starting (attempt 2)
+[2026-03-15 16:43:14] [AGENT] pre-recon: Failed - Authentication failed: Failed to authenticate. API Error: 403 {"error":{"type":"trial_expired","message":"Your trial has ex (5.6s $0.00)
+
+================================================================================
+Workflow FAILED
+────────────────────────────────────────
+Workflow ID: mcp-tool-nvidia
+Status:      failed
+Duration:    0ms
+Total Cost:  $0.0000
+Agents:      0 completed
+Error:       pre-recon failed
+             AgentExecutionError
+             Authentication failed: Failed to authenticate. API Error: 403 {"error":{"type":"trial_expired","message":"Your trial has ex
+
+Agent Breakdown:
+================================================================================

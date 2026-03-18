@@ -149,7 +149,7 @@ Shannon Pro supports a self-hosted runner model (similar to GitHub Actions self-
   - **Claude Code OAuth token**
   - **AWS Bedrock** - Route through Amazon Bedrock with AWS credentials (see [AWS Bedrock](#aws-bedrock))
   - **Google Vertex AI** - Route through Google Cloud Vertex AI (see [Google Vertex AI](#google-vertex-ai))
-  - **[EXPERIMENTAL - UNSUPPORTED] Alternative providers via Router Mode** - OpenAI or Google Gemini via OpenRouter (see [Router Mode](#experimental---unsupported-router-mode-alternative-providers))
+- **[EXPERIMENTAL - UNSUPPORTED] Alternative providers via Router Mode** - OpenAI, OpenRouter, or NVIDIA Integrate (see [Router Mode](#experimental---unsupported-router-mode-alternative-providers))
 
 ### Quick Start
 
@@ -458,7 +458,7 @@ Set `CLOUD_ML_REGION=global` for global endpoints, or a specific region like `us
 
 Shannon can experimentally route requests through alternative AI providers using claude-code-router. This mode is not officially supported and is intended primarily for:
 
-* **Model experimentation** — try Shannon with GPT-5.2 or Gemini 3–family models
+* **Model experimentation** — try Shannon with GPT-5.3-Codex, Gemini 3–family models, or NVIDIA-hosted OpenAI-compatible models
 
 #### Quick Setup
 
@@ -469,9 +469,13 @@ Shannon can experimentally route requests through alternative AI providers using
 OPENAI_API_KEY=sk-...
 # OR
 OPENROUTER_API_KEY=sk-or-...
+# OR
+NVIDIA_API_KEY=nvapi-...
 
 # Set default model:
-ROUTER_DEFAULT=openai,gpt-5.2  # provider,model format
+ROUTER_DEFAULT=openai,gpt-5.3-codex  # provider,model format
+# Example NVIDIA route:
+# ROUTER_DEFAULT=nvidia,minimaxai/minimax-m2.5
 ```
 
 2. Run with `ROUTER=true`:
@@ -484,8 +488,9 @@ ROUTER_DEFAULT=openai,gpt-5.2  # provider,model format
 
 | Provider | Models |
 |----------|--------|
-| OpenAI | gpt-5.2, gpt-5-mini |
+| OpenAI | gpt-5.3-codex, gpt-5-mini |
 | OpenRouter | google/gemini-3-flash-preview |
+| NVIDIA | minimaxai/minimax-m2.5 |
 
 #### Disclaimer
 

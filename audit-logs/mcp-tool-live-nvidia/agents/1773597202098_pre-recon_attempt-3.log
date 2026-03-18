@@ -1,0 +1,10 @@
+========================================
+Agent: pre-recon
+Attempt: 3
+Started: 2026-03-15T17:53:22.098Z
+Session: mcp-tool-live-nvidia
+Web URL: https://demumumind.github.io/mcp-tool/
+========================================
+{"type":"agent_start","timestamp":"2026-03-15T17:53:22.104Z","data":{"agentName":"pre-recon","attemptNumber":3,"timestamp":"2026-03-15T17:53:22.104Z"}}
+{"type":"llm_response","timestamp":"2026-03-15T17:57:41.801Z","data":{"turn":1,"content":"API Error: Unable to connect to API (EAI_AGAIN)","timestamp":"2026-03-15T17:57:41.801Z"}}
+{"type":"agent_end","timestamp":"2026-03-15T17:57:48.112Z","data":{"agentName":"pre-recon","success":false,"duration_ms":259709,"cost_usd":0,"timestamp":"2026-03-15T17:57:48.112Z"}}
