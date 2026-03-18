@@ -74,6 +74,32 @@ run_codex_command() {
   "$CODEX_BIN" "$@"
 }
 
+set_env_value() {
+  local key="$1"
+  local value="$2"
+  local tmp_file
+
+  if [ -f .env ]; then
+    tmp_file="$(mktemp)"
+    awk -v k="$key" -v v="$value" '
+      BEGIN { updated=0 }
+      $0 ~ ("^[[:space:]]*" k "=") { print k "=" v; updated=1; next }
+      { print }
+      END { if (!updated) print k "=" v }
+    ' .env > "$tmp_file"
+    mv "$tmp_file" .env
+  else
+    printf '%s=%s\n' "$key" "$value" > .env
+  fi
+
+  export "${key}=${value}"
+}
+
+persist_openai_oauth_preference() {
+  set_env_value "OPENAI_OAUTH" "true"
+  echo "Saved OPENAI_OAUTH=true to .env"
+}
+
 show_help() {
   cat << 'EOF'
 
@@ -88,6 +114,7 @@ show_help() {
 
 Usage:
   ./shannon start URL=<url> REPO=<name>   Start a pentest workflow
+  ./shannon codex login                    Authenticate OpenAI OAuth via Codex CLI
   ./shannon workspaces                    List all workspaces
   ./shannon query ID=<workflow-id>       Show workflow status and live progress
   ./shannon logs [ID=<workflow-id>]      Tail worker logs or a specific workflow log
@@ -106,7 +133,12 @@ Options for 'start':
 Options for 'stop':
   CLEAN=true             Remove all data including volumes
 
+Options for 'codex login':
+  --device-auth          Use device auth for headless / remote environments
+
 Examples:
+  ./shannon codex login
+  ./shannon codex login --device-auth
   ./shannon start URL=https://example.com REPO=repo-name
   ./shannon start URL=https://example.com REPO=repo-name WORKSPACE=q1-audit
   ./shannon start URL=https://example.com REPO=repo-name CONFIG=./config.yaml
@@ -170,14 +202,56 @@ show_openai_oauth_login_help() {
 ERROR: OPENAI_OAUTH=true requires an active Codex login.
 
 Authenticate with OpenAI OAuth first:
-  codex login
+  ./shannon codex login
 
 The terminal will show a browser URL. Open it, sign in at auth.openai.com,
 and wait for Codex CLI to confirm the login locally.
 
 On a remote or headless machine, use:
-  codex login --device-auth
+  ./shannon codex login --device-auth
 EOF
+}
+
+cmd_codex() {
+  local subcommand="${1:-}"
+  shift || true
+
+  case "$subcommand" in
+    login)
+      if require_codex_login; then
+        echo "Codex already logged in."
+      else
+        run_codex_command login "$@" || exit $?
+      fi
+
+      if require_codex_login; then
+        persist_openai_oauth_preference
+        echo "OpenAI OAuth is now enabled for Shannon router mode."
+        echo "Next run example:"
+        echo "  ./shannon start URL=https://example.com REPO=repo-name ROUTER=true"
+        return 0
+      fi
+
+      echo "ERROR: Codex login did not complete successfully."
+      exit 1
+      ;;
+    status)
+      run_codex_command login status "$@"
+      ;;
+    help|--help|-h|"")
+      cat << 'EOF'
+Usage:
+  ./shannon codex login
+  ./shannon codex login --device-auth
+  ./shannon codex status
+EOF
+      ;;
+    *)
+      echo "ERROR: Unknown codex subcommand: $subcommand"
+      echo "Usage: ./shannon codex login [--device-auth]"
+      exit 1
+      ;;
+  esac
 }
 
 # Check if Temporal is running and healthy
@@ -283,14 +357,14 @@ cmd_start() {
         echo "       Download a key from the GCP Console (IAM > Service Accounts > Keys)"
         exit 1
       fi
-    elif [ "$ROUTER" = "true" ] && { [ -n "$OPENAI_API_KEY" ] || [ -n "$OPENROUTER_API_KEY" ]; }; then
+    elif [ "$ROUTER" = "true" ] && { [ -n "$OPENAI_API_KEY" ] || [ -n "$OPENROUTER_API_KEY" ] || [ -n "$NVIDIA_API_KEY" ]; }; then
       # Router mode with alternative provider - set a placeholder for SDK init
       export ANTHROPIC_API_KEY="router-mode"
     else
       echo "ERROR: Set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in .env"
       echo "       (or use CLAUDE_CODE_USE_BEDROCK=1 for AWS Bedrock,"
       echo "        CLAUDE_CODE_USE_VERTEX=1 for Google Vertex AI,"
-      echo "        or ROUTER=true with OPENAI_API_KEY / OPENROUTER_API_KEY,"
+      echo "        or ROUTER=true with OPENAI_API_KEY / OPENROUTER_API_KEY / NVIDIA_API_KEY,"
       echo "        or run 'codex login' first and then use ROUTER=true OPENAI_OAUTH=true)"
       exit 1
     fi
@@ -332,8 +406,8 @@ cmd_start() {
       echo "Starting claude-code-router..."
 
       # Check for provider API keys
-      if [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
-        echo "WARNING: No provider API key set (OPENAI_API_KEY or OPENROUTER_API_KEY). Router may not work."
+      if [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ] && [ -z "$NVIDIA_API_KEY" ]; then
+        echo "WARNING: No provider API key set (OPENAI_API_KEY, OPENROUTER_API_KEY, or NVIDIA_API_KEY). Router may not work."
       fi
 
       # Start router with profile
@@ -489,6 +563,10 @@ case "${1:-help}" in
   logs)
     shift
     cmd_logs "$@"
+    ;;
+  codex)
+    shift
+    cmd_codex "$@"
     ;;
   query)
     shift

@@ -1,0 +1,53 @@
+{
+  "session": {
+    "id": "mcp-tool-login-flow",
+    "webUrl": "https://demumumind.github.io/mcp-tool/",
+    "status": "failed",
+    "createdAt": "2026-03-15T14:09:16.160Z",
+    "resumeAttempts": [],
+    "originalWorkflowId": "mcp-tool-login-flow_shannon-1773583755781",
+    "repoPath": "/repos/mcp-tool",
+    "completedAt": "2026-03-15T14:37:21.333Z"
+  },
+  "metrics": {
+    "total_duration_ms": 0,
+    "total_cost_usd": 0,
+    "phases": {},
+    "agents": {
+      "pre-recon": {
+        "status": "in-progress",
+        "attempts": [
+          {
+            "attempt_number": 1,
+            "duration_ms": 189986,
+            "cost_usd": 0,
+            "success": false,
+            "timestamp": "2026-03-15T14:12:28.389Z",
+            "model": "claude-opus-4-6",
+            "error": "Agent pre-recon failed output validation"
+          },
+          {
+            "attempt_number": 2,
+            "duration_ms": 197376,
+            "cost_usd": 0,
+            "success": false,
+            "timestamp": "2026-03-15T14:24:14.523Z",
+            "model": "claude-opus-4-6",
+            "error": "Agent pre-recon failed output validation"
+          },
+          {
+            "attempt_number": 3,
+            "duration_ms": 184201,
+            "cost_usd": 0,
+            "success": false,
+            "timestamp": "2026-03-15T14:37:21.136Z",
+            "model": "claude-opus-4-6",
+            "error": "Agent pre-recon failed output validation"
+          }
+        ],
+        "final_duration_ms": 0,
+        "total_cost_usd": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+================================================================================
+Shannon Pentest - Workflow Log
+================================================================================
+Workflow ID: mcp-tool-security-openai
+Target URL:  https://demumumind.github.io/mcp-tool/
+Started:     2026-03-15T16:39:02.048Z
+================================================================================
+
+[2026-03-15 16:39:02] [PHASE] Starting: pre-recon
+[2026-03-15 16:39:11] [AGENT] pre-recon: Starting (attempt 1)
+[2026-03-15 16:39:22] [AGENT] pre-recon: Failed - Authentication failed: Failed to authenticate. API Error: 403 {"error":{"type":"trial_expired","message":"Your trial has ex (7.0s $0.00)
+
+================================================================================
+Workflow FAILED
+────────────────────────────────────────
+Workflow ID: mcp-tool-security-openai
+Status:      failed
+Duration:    0ms
+Total Cost:  $0.0000
+Agents:      0 completed
+Error:       pre-recon failed
+             AgentExecutionError
+             Authentication failed: Failed to authenticate. API Error: 403 {"error":{"type":"trial_expired","message":"Your trial has ex
+
+Agent Breakdown:
+================================================================================
